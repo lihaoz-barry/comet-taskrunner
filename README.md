@@ -1,6 +1,19 @@
 # Comet Task Runner
 
-A Python-based tool to automate URL execution in the Comet Browser.
+A Python-based automation tool for Comet Browser with support for URL navigation and AI assistant interaction tasks.
+
+![Version](https://img.shields.io/badge/version-0.1.0-blue)
+![Python](https://img.shields.io/badge/python-3.x-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+## Features
+
+- **URL Task Automation**: Automatically open and navigate to URLs in Comet Browser
+- **AI Assistant Integration**: Automate AI assistant interactions with custom instructions
+- **Component-Based Architecture**: Extensible task system with abstract base classes
+- **Real-time Monitoring**: Track task status with process monitoring and polling
+- **User-Friendly GUI**: Tkinter-based frontend for easy task management
+- **REST API**: Flask backend for programmatic task execution
 
 ## Prerequisites
 
@@ -30,10 +43,41 @@ Double-click the **`run_app.bat`** file.
 
 ## Architecture
 
-- **Frontend (`src/frontend.py`)**: A Tkinter GUI to manage URLs and trigger execution.
-- **Backend (`src/backend.py`)**: A Flask server that handles the actual browser automation.
-- **Task Manager (`src/task_manager.py`)**: Manages the lifecycle of each execution job.
-- **`urls.json`**: Stores your URL list.
+### Component Overview
+
+```
+comet-taskrunner/
+├── src/
+│   ├── frontend.py         # Tkinter GUI client
+│   ├── backend.py          # Flask REST API server
+│   ├── task_manager.py     # Task lifecycle manager
+│   └── tasks/              # Task component package
+│       ├── base_task.py    # Abstract base class
+│       ├── url_task.py     # URL navigation task
+│       └── ai_task.py      # AI assistant task
+├── docs/                   # Detailed documentation
+├── requirements.txt        # Python dependencies
+└── urls.json              # URL persistence storage
+```
+
+### Architecture Layers
+
+- **Frontend (`src/frontend.py`)**: Tkinter GUI for task management and monitoring
+- **Backend (`src/backend.py`)**: Flask REST API server for task execution
+- **Task Manager (`src/task_manager.py`)**: In-memory task storage and lifecycle management
+- **Task Components (`src/tasks/`)**: Reusable, framework-independent task implementations
+
+### API Endpoints
+
+#### Task Execution
+- `POST /execute/url` - Execute a URL navigation task
+- `POST /execute/ai` - Execute an AI assistant task
+
+#### Monitoring
+- `GET /status/<task_id>` - Get task status
+- `GET /jobs` - List all tasks
+- `GET /health` - Server health check
+- `POST /callback` - Manual task completion
 
 ### Task Execution Lifecycle
 
@@ -63,8 +107,96 @@ You might notice the Frontend constantly sending requests to the Backend. This i
 
 ## Usage
 
-1.  **Add URL**: Type a URL and click "Add URL".
-2.  **Execute**: Click "Execute" next to a URL.
-    - **Yellow**: Request sent to browser.
-    - **Green**: Browser launched successfully.
-3.  **Remove**: Click "Remove" to delete a URL.
+### GUI Usage
+
+1.  **Add URL**: Type a URL and click "Add URL"
+2.  **Execute**: Click "Execute" next to a URL
+    - **Yellow**: Task is running
+    - **Green**: Task completed successfully
+3.  **Remove**: Click "Remove" to delete a URL
+
+### API Usage
+
+#### Execute URL Task
+```bash
+curl -X POST http://127.0.0.1:5000/execute/url \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.google.com"}'
+```
+
+#### Execute AI Task
+```bash
+curl -X POST http://127.0.0.1:5000/execute/ai \
+  -H "Content-Type: application/json" \
+  -d '{"instruction": "Please summarize this document"}'
+```
+
+#### Check Task Status
+```bash
+curl http://127.0.0.1:5000/status/<task_id>
+```
+
+## Technical Details
+
+### Task Types
+
+#### URLTask
+- Launches Comet Browser with specified URL
+- Auto-completes when browser process exits
+- Simple process monitoring
+
+#### AITask (Experimental)
+- Launches Comet Browser
+- Executes automation sequence (placeholder)
+- AI-based completion detection (future)
+
+### Task Lifecycle
+
+```
+CREATED → RUNNING → DONE/FAILED
+```
+
+Each task tracks:
+- Unique task ID (UUID)
+- Process ID and status
+- Creation, start, and completion timestamps
+- Process metrics (CPU, memory)
+
+## Documentation
+
+For detailed documentation, see the `docs/` directory:
+- `架构说明（中文）.md` - Complete architecture guide (Chinese)
+- `task_lifecycle.md` - Task lifecycle details
+- `implementation_plan.md` - Development roadmap
+- `组件化设计.md` - Component design patterns
+
+## Future Development
+
+- [ ] Complete AI task automation (mouse/keyboard control)
+- [ ] Screenshot-based completion detection
+- [ ] OpenCV/AI model integration
+- [ ] Coordinate calibration tool
+- [ ] Task scheduling and queuing
+- [ ] Task history and analytics
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+MIT License - See LICENSE file for details
+
+## Acknowledgments
+
+Built with:
+- Python 3.x
+- Flask (REST API)
+- Tkinter (GUI)
+- psutil (Process monitoring)
+
+---
+
+**Version**: 0.1.0
+**Author**: Barry
+**Repository**: [comet-taskrunner](https://github.com/lihaoz-barry/comet-taskrunner)
