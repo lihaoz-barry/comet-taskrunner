@@ -42,6 +42,7 @@ Thumbs.db
 # Project specific
 *.log
 urls.json
+screenshots/
 
 # Test files
 test_*.py.log

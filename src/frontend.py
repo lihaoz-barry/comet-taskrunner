@@ -16,7 +16,7 @@ class CometRunnerApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Comet Task Runner")
-        self.root.geometry("700x500")
+        self.root.geometry("700x650")  # Increased height for AI section
         
         # Style
         self.style = ttk.Style()
@@ -31,6 +31,30 @@ class CometRunnerApp:
         self.polling_active = True
         self.poll_thread = threading.Thread(target=self.poll_statuses, daemon=True)
         self.poll_thread.start()
+        
+        # Register cleanup on window close
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        
+        # Also register with atexit
+        import atexit
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent))
+        from utils.cleanup import cleanup_temp_files
+        atexit.register(cleanup_temp_files)
+    
+    def on_closing(self):
+        """Handle window close event"""
+        print("Frontend closing...")
+        try:
+            from pathlib import Path
+            sys.path.insert(0, str(Path(__file__).parent))
+            from utils.cleanup import cleanup_temp_files
+            cleanup_temp_files()
+        except Exception as e:
+            print(f"Cleanup error: {e}")
+        
+        self.polling_active = False  # Stop polling thread
+        self.root.destroy()
 
     def load_urls(self):
         if os.path.exists(URLS_FILE):
@@ -62,9 +86,47 @@ class CometRunnerApp:
         header_frame.pack(fill=tk.X)
         ttk.Label(header_frame, text="Comet Browser Task Runner", font=("Helvetica", 16, "bold")).pack(side=tk.LEFT)
         
+        # ====================================================================
+        # AI PROMPT SECTION (NEW!)
+        # ====================================================================
+        ai_frame = ttk.LabelFrame(self.root, text="AI Assistant Task", padding="10")
+        ai_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        # AI Prompt label
+        ttk.Label(ai_frame, text="Prompt:", font=("Helvetica", 10, "bold")).pack(anchor=tk.W)
+        
+        # AI Prompt input (multi-line text box)
+        self.ai_prompt_text = tk.Text(ai_frame, height=3, wrap=tk.WORD)
+        self.ai_prompt_text.pack(fill=tk.X, pady=(5, 10))
+        
+        # AI Execute button frame
+        ai_btn_frame = ttk.Frame(ai_frame)
+        ai_btn_frame.pack(fill=tk.X)
+        
+        self.ai_execute_btn = ttk.Button(
+            ai_btn_frame, 
+            text="🤖 Execute AI Task", 
+            command=self.execute_ai_task,
+            style="AI.TButton"
+        )
+        self.ai_execute_btn.pack(side=tk.RIGHT)
+        
+        # AI Status label
+        self.ai_status_var = tk.StringVar(value="Status: Ready")
+        ttk.Label(ai_btn_frame, textvariable=self.ai_status_var).pack(side=tk.LEFT)
+        
+        # Style for AI button
+        self.style.configure("AI.TButton", foreground="#0066CC", font=("Helvetica", 10, "bold"))
+        
+        # ====================================================================
+        # URL SECTION
+        # ====================================================================
+        url_section_frame = ttk.LabelFrame(self.root, text="URL Tasks", padding="10")
+        url_section_frame.pack(fill=tk.BOTH, expand=True, padx=10)
+        
         # Add URL Area
-        add_frame = ttk.Frame(self.root, padding="10")
-        add_frame.pack(fill=tk.X)
+        add_frame = ttk.Frame(url_section_frame)
+        add_frame.pack(fill=tk.X, pady=(0, 10))
         
         # Use pack with expand/fill for the entry to take up available space
         ttk.Button(add_frame, text="Add URL", command=self.add_url).pack(side=tk.RIGHT, padx=(10, 0))
@@ -72,7 +134,7 @@ class CometRunnerApp:
         ttk.Entry(add_frame, textvariable=self.new_url_var).pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         # List Area
-        list_frame = ttk.Frame(self.root, padding="10")
+        list_frame = ttk.Frame(url_section_frame)
         list_frame.pack(fill=tk.BOTH, expand=True)
         
         # Canvas for scrolling
@@ -175,6 +237,86 @@ class CometRunnerApp:
                 self.root.after(0, lambda: messagebox.showerror("Connection Error", "Could not connect to backend."))
 
         threading.Thread(target=run_request, daemon=True).start()
+    
+    def execute_ai_task(self):
+        """Execute an AI task by calling the backend API."""
+        # Get prompt text
+        prompt = self.ai_prompt_text.get("1.0", tk.END).strip()
+        
+        if not prompt:
+            messagebox.showwarning("No Prompt", "Please enter a prompt for the AI assistant.")
+            return
+        
+        # Disable button during execution
+        self.ai_execute_btn.configure(state=tk.DISABLED)
+        self.ai_status_var.set("Status: Executing...")
+        
+        def run_ai_request():
+            try:
+                # Call the AI task API endpoint
+                response = requests.post(f"{BACKEND_URL}/execute/ai", json={"instruction": prompt})
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    task_id = data.get('task_id')
+                    print(f"Started AI task {task_id}")
+                    
+                    # Update status
+                    self.root.after(0, lambda: self.ai_status_var.set(f"Status: Running (Task: {task_id[:8]}...)"))
+                    
+                    # Poll for completion
+                    self._poll_ai_task(task_id)
+                else:
+                    print(f"Error executing AI task: {response.text}")
+                    self.root.after(0, lambda: messagebox.showerror("Error", f"Failed to execute: {response.text}"))
+                    self.root.after(0, lambda: self.ai_status_var.set("Status: Error"))
+                    self.root.after(0, lambda: self.ai_execute_btn.configure(state=tk.NORMAL))
+            except Exception as e:
+                print(f"Connection error: {e}")
+                self.root.after(0, lambda: messagebox.showerror("Connection Error", "Could not connect to backend."))
+                self.root.after(0, lambda: self.ai_status_var.set("Status: Connection Error"))
+                self.root.after(0, lambda: self.ai_execute_btn.configure(state=tk.NORMAL))
+        
+        threading.Thread(target=run_ai_request, daemon=True).start()
+    
+    def _poll_ai_task(self, task_id):
+        """Poll AI task status until completion"""
+        def poll():
+            try:
+                response = requests.get(f"{BACKEND_URL}/status/{task_id}")
+                if response.status_code == 200:
+                    data = response.json()
+                    status = data.get('status')
+                    
+                    # Get automation progress if available
+                    automation_progress = data.get('automation_progress', {})
+                    completed_steps = automation_progress.get('completed_steps', 0)
+                    total_steps = automation_progress.get('total_steps', 7)
+                    
+                    if status == "running":
+                        self.root.after(0, lambda: self.ai_status_var.set(
+                            f"Status: Running - Step {completed_steps}/{total_steps}"
+                        ))
+                        # Continue polling
+                        threading.Timer(1.0, poll).start()
+                    elif status == "done":
+                        self.root.after(0, lambda: self.ai_status_var.set("Status: ✓ Completed"))
+                        self.root.after(0, lambda: self.ai_execute_btn.configure(state=tk.NORMAL))
+                        self.root.after(0, lambda: messagebox.showinfo("Success", "AI task completed successfully!"))
+                    elif status == "failed":
+                        error_msg = data.get('error_message', 'Unknown error')
+                        self.root.after(0, lambda: self.ai_status_var.set(f"Status: ✗ Failed"))
+                        self.root.after(0, lambda: self.ai_execute_btn.configure(state=tk.NORMAL))
+                        self.root.after(0, lambda: messagebox.showerror("Task Failed", f"Error: {error_msg}"))
+                    else:
+                        # Continue polling for other statuses
+                        threading.Timer(1.0, poll).start()
+            except:
+                # Retry on connection error
+                threading.Timer(2.0, poll).start()
+        
+        poll()
+
 
     def poll_statuses(self):
         while self.polling_active:
