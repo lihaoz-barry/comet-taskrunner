@@ -1,386 +1,539 @@
 """
-AI Assistant Task Component
+AI Assistant Task Component - WITH OPENCV AUTOMATION
 
-This is a **reusable component** for AI Assistant automation.
-Can be used in ANY Python project.
+Fully automated AI interaction using:
+- Window detection & activation
+- OpenCV template matching
+- MSS screenshot capture
+- PyAutoGUI mouse/keyboard control
 
 Input Contract:
     instruction (str): The text instruction for AI
-    coordinates (dict, optional): UI element coordinates
     
 Output Contract:
     execute() returns: int (process ID)
     check_completion() returns: bool
-    
-Dependencies:
-    - subprocess (stdlib)
-    - threading (stdlib)
-    - time (stdlib)
-    - psutil
-    - TODO: pyautogui (for mouse/keyboard)
-    - TODO: PIL (for screenshots)
-    - TODO: opencv/AI model (for detection)
-    
-Usage in Other Projects:
-    ```python
-    from tasks import AITask
-    
-    # In a Django view
-    task = AITask(instruction="Summarize this document")
-    pid = task.execute(comet_path=settings.BROWSER_PATH)
-    task.start(pid)
-    
-    # Store task_id in session/database for later tracking
-    request.session['ai_task_id'] = task.task_id
-    ```
-    
-    ```python
-    # In a CLI tool
-    from tasks import AITask
-    import time
-    
-    task = AITask("Generate report for Q4")
-    pid = task.execute(comet_path="/usr/bin/comet")
-    task.start(pid)
-    
-    # Simple polling
-    while not task.check_completion():
-        time.sleep(5)
-    task.complete()
-    ```
-
-Component Philosophy:
-    This component is SEPARATE from any framework.
-    It defines WHAT to do, not WHERE/WHEN/HOW to integrate it.
-    Integration is handled by the calling code (Flask, Django, etc.)
+    get_automation_progress() returns: dict (step progress)
 """
 
 import subprocess
 import threading
 import time
 import logging
-from typing import Dict, Any, Optional, Tuple
-from .base_task import BaseTask, TaskType
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, Any, Optional
+from .base_task import BaseTask, TaskType, TaskResult
+
+# Import automation modules
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from automation import WindowManager, ScreenshotCapture, PatternMatcher, MouseController
 
 logger = logging.getLogger(__name__)
 
 
+class StepResult:
+    """Result of a single automation step"""
+    
+    def __init__(self, step_name: str, success: bool, data: Dict = None, error: str = None):
+        self.step_name = step_name
+        self.success = success
+        self.data = data or {}
+        self.error = error
+        self.timestamp = datetime.now()
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "step_name": self.step_name,
+            "success": self.success,
+            "data": self.data,
+            "error": self.error,
+            "timestamp": self.timestamp.isoformat()
+        }
+
+
 class AITask(BaseTask):
     """
-    AI Assistant Interaction Task Component.
+    AI Assistant Interaction Task with OpenCV Automation.
     
-    Automates interaction with AI assistant through:
-    - Mouse clicks (coordinates)
-    - Keyboard input (typing)
-    - AI-based completion detection
-    
-    This is a PURE component - no Flask/Tkinter dependencies.
-    
-    Attributes:
-        instruction (str): Text to send to AI
-        coordinates (dict): UI element positions
-    
-    Completion Criteria:
-        - Process exit
-        - AI screenshot analysis (PLACEHOLDER)
-        - Pattern matching (PLACEHOLDER)
+    7-Step Automation Sequence:
+    1. Launch Comet browser
+    2. Activate window (force focus)
+    3. Find Assistant button (template matching)
+    4. Click Assistant button
+    5. Find input box (template matching)
+    6. Input prompt text
+    7. Send instruction (Enter key)
     """
     
-    # Default coordinates (can be overridden per instance)
-    DEFAULT_COORDINATES = {
-        'assistant_button': (100, 100),
-        'task_input_box': (500, 300),
-        'send_button': (800, 500)
+    # Template files (just filenames, path is in template_dir)
+    TEMPLATES = {
+        'assistant_button': 'comet_Assistant_Unactive.png',
+        'input_box': 'comet_input_box.png',  # User needs to create this
     }
     
-    def __init__(
-        self,
-        instruction: str,
-        coordinates: Optional[Dict[str, Tuple[int, int]]] = None
-    ):
+    # Matching thresholds
+    THRESHOLDS = {
+        'assistant_button': 0.3,  # Fuzzy matching
+        'input_box': 0.5,  # More strict
+    }
+    
+    def __init__(self, instruction: str, template_dir: str = None):
         """
-        Create an AI Assistant interaction task.
+        Create AI automation task.
         
         Args:
-            instruction: The text instruction for the AI
-            coordinates: Optional coordinate overrides
-                {
-                    'assistant_button': (x, y),
-                    'task_input_box': (x, y),
-                    'send_button': (x, y)
-                }
-        
-        Example:
-            # Use default coordinates
-            task = AITask("Summarize this document")
-            
-            # Use custom coordinates
-            task = AITask(
-                instruction="Generate report",
-                coordinates={
-                    'assistant_button': (200, 150),
-                    'task_input_box': (600, 400),
-                }
-            )
+            instruction: The text instruction for AI
+            template_dir: Optional custom template directory
         """
         super().__init__(TaskType.AI_ASSISTANT)
         self.instruction = instruction
-        self.coordinates = coordinates or self.DEFAULT_COORDINATES.copy()
         
-        logger.info(f"AITask created: {instruction[:50]}...")
+        # Template directory
+        if template_dir:
+            self.template_dir = Path(template_dir)
+        else:
+            # Default: comet-taskrunner/templates
+            self.template_dir = Path(__file__).parent.parent.parent / "templates"
+        
+        # Automation state
+        self.hwnd = None
+        self.window_rect = None
+        self.step_results = []
+        self.screenshot_dir = Path(__file__).parent.parent.parent / "screenshots"
+        self.screenshot_dir.mkdir(exist_ok=True)
+        
+        logger.info(f"AITask created with instruction: {instruction[:50]}...")
+        logger.info(f"Template directory: {self.template_dir}")
     
     def execute(self, comet_path: str) -> int:
         """
         Execute AI automation sequence.
         
-        Steps:
-        1. Launch browser
-        2. Wait for initialization
-        3. Run automation sequence (background thread)
-        4. Return process ID
-        
         Args:
-            comet_path: Path to browser executable
+            comet_path: Path to Comet browser executable
             
         Returns:
-            int: Process ID of launched browser
-            
-        Raises:
-            Exception: If browser launch fails
-            
-        Note:
-            Automation runs in background thread to avoid blocking.
-            The main thread returns immediately after launching.
+            int: Process ID
         """
-        logger.info("Launching browser for AI Assistant task")
+        logger.info("="*60)
+        logger.info("LAUNCHING COMET BROWSER FOR AI TASK")
+        logger.info("="*60)
         
         try:
-            # Step 1: Launch browser (no URL, just open app)
+            # Launch browser
             process = subprocess.Popen([comet_path])
             process_id = process.pid
             
-            # Step 2 & 3: Schedule automation sequence
+            logger.info(f"✓ Browser launched successfully, PID={process_id}")
+            
+            # Start automation in background thread
             automation_thread = threading.Thread(
                 target=self._automation_sequence,
                 daemon=True
             )
             automation_thread.start()
             
-            logger.info(f"AI task browser started with PID: {process_id}")
             return process_id
             
         except Exception as e:
-            error_msg = f"Failed to launch browser for AI task: {e}"
+            error_msg = f"Failed to launch browser: {e}"
             logger.error(error_msg)
             raise Exception(error_msg)
     
     def _automation_sequence(self):
         """
-        Execute the automation sequence.
+        MAIN AUTOMATION SEQUENCE - 7 Steps
         
-        This runs in a BACKGROUND THREAD to not block the API response.
-        
-        Sequence:
-        1. Wait for browser initialization (3 seconds)
-        2. Click AI Assistant button
-        3. Click task input box
-        4. Type instruction
-        5. Send instruction
-        
-        Error Handling:
-            Catches all exceptions and marks task as failed.
+        Runs in background thread.
         """
+        logger.info("="*60)
+        logger.info("STARTING AUTOMATION SEQUENCE")
+        logger.info(f"Task ID: {self.task_id}")
+        logger.info(f"Instruction: {self.instruction}")
+        logger.info("="*60)
+        
         try:
-            # Step 1: Wait for browser to fully load
-            time.sleep(3)
+            # Step 1: Wait for browser initialization
+            self._step_1_wait_for_initialization()
             
-            logger.info(f"Starting automation for task {self.task_id}")
+            # Step 2: Activate window
+            result = self._step_2_activate_window()
+            if not result.success:
+                self.fail(f"Step 2 failed: {result.error}")
+                return
             
-            # Step 2: Click AI Assistant button
-            self._click_assistant_button()
-            time.sleep(0.5)
+            # Step 3: Find Assistant button
+            result = self._step_3_find_assistant()
+            if not result.success:
+                self.fail(f"Step 3 failed: {result.error}")
+                return
+            assistant_coords = result.data['coordinates']
             
-            # Step 3: Click input box
-            self._click_task_input()
-            time.sleep(0.5)
+            # Step 4: Click Assistant button
+            result = self._step_4_click_assistant(assistant_coords)
+            if not result.success:
+                self.fail(f"Step 4 failed: {result.error}")
+                return
             
-            # Step 4: Type instruction
-            self._type_instruction()
-            time.sleep(0.5)
+            # Step 5: Find input box
+            result = self._step_5_find_input_box()
+            if not result.success:
+                self.fail(f"Step 5 failed: {result.error}")
+                return
+            input_coords = result.data['coordinates']
             
-            # Step 5: Send
-            self._send_instruction()
+            # Step 6: Input text
+            result = self._step_6_input_text(input_coords)
+            if not result.success:
+                self.fail(f"Step 6 failed: {result.error}")
+                return
             
-            logger.info(f"Automation sequence completed for task {self.task_id}")
+            # Step 7: Send instruction
+            result = self._step_7_send()
+            if not result.success:
+                self.fail(f"Step 7 failed: {result.error}")
+                return
+            
+            logger.info("="*60)
+            logger.info("✓ AUTOMATION SEQUENCE COMPLETED SUCCESSFULLY")
+            logger.info("="*60)
             
         except Exception as e:
-            error_msg = f"Automation failed: {e}"
-            logger.error(f"Task {self.task_id} - {error_msg}")
+            error_msg = f"Automation sequence failed: {e}"
+            logger.error(f"✗ {error_msg}")
+            import traceback
+            traceback.print_exc()
             self.fail(error_msg)
     
-    # ------------------------------------------------------------------------
-    # Automation Actions (PLACEHOLDERS - To be implemented)
-    # ------------------------------------------------------------------------
+    # ========================================================================
+    # AUTOMATION STEPS
+    # ========================================================================
     
-    def _click_assistant_button(self):
-        """
-        PLACEHOLDER: Click the AI Assistant button.
+    def _step_1_wait_for_initialization(self):
+        """Step 1: Wait for browser to initialize"""
+        logger.info("")
+        logger.info("[STEP 1/7] Waiting for browser initialization...")
         
-        Implementation:
-            import pyautogui
-            x, y = self.coordinates['assistant_button']
-            pyautogui.click(x, y)
+        time.sleep(8)  # Give Comet more time to start (increased from 5s)
         
-        Alternative (more reliable):
-            Use win32gui to find window by title/class
-            Then calculate relative coordinates
-        """
-        x, y = self.coordinates['assistant_button']
-        logger.info(f"[PLACEHOLDER] Click AI button at ({x}, {y})")
+        result = StepResult("wait_initialization", True, 
+                          data={'wait_time': 8})
+        self.step_results.append(result)
         
-        # TODO: Implement
-        # import pyautogui
-        # pyautogui.click(x, y)
+        logger.info("  ✓ Browser initialization wait completed")
     
-    def _click_task_input(self):
-        """
-        PLACEHOLDER: Click the task input box.
+    def _step_2_activate_window(self) -> StepResult:
+        """Step 2: Find and activate Comet window"""
+        logger.info("")
+        logger.info("[STEP 2/7] Activating Comet window...")
         
-        Implementation:
-            import pyautogui
-            x, y = self.coordinates['task_input_box']
-            pyautogui.click(x, y)
-        """
-        x, y = self.coordinates['task_input_box']
-        logger.info(f"[PLACEHOLDER] Click input box at ({x}, {y})")
-        
-        # TODO: Implement
-        # import pyautogui
-        # pyautogui.click(x, y)
+        try:
+            # Find window - with filtering to exclude frontend
+            logger.info("  → Searching for Comet browser window (excluding frontend)...")
+            
+            # Use more specific keywords to find actual browser, not frontend
+            result = WindowManager.find_comet_window(keywords=["New Tab - Comet", "Comet"])
+            
+            # If found, verify it's not the frontend
+            if result:
+                hwnd, rect = result
+                import win32gui
+                window_title = win32gui.GetWindowText(hwnd)
+                
+                # Exclude frontend window
+                if "Task Runner" in window_title:
+                    logger.warning(f"  ⚠ Found frontend window, searching for browser window...")
+                    # Try again without generic "Comet" keyword
+                    result = WindowManager.find_comet_window(keywords=["New Tab"])
+            
+            if not result:
+                error = "Comet browser windownot found (may still be loading)"
+                logger.error(f"  ✗ {error}")
+                logger.info("  💡 Tip: Browser may need more time to start")
+                step_result = StepResult("activate_window", False, error=error)
+                self.step_results.append(step_result)
+                return step_result
+            
+            self.hwnd, self.window_rect = result
+            window_title = win32gui.GetWindowText(self.hwnd)
+            logger.info(f"  ✓ Window found: HWND={self.hwnd}, Title='{window_title}'")
+            logger.info(f"  ✓ Window rect: {self.window_rect}")
+            
+            # Activate window
+            success = WindowManager.activate_window(self.hwnd)
+            
+            if success:
+                logger.info("  ✓ Window activated and focused")
+                step_result = StepResult("activate_window", True,
+                                          data={'hwnd': self.hwnd, 'rect': self.window_rect})
+            else:
+                logger.warning("  ⚠ Window activation may have failed, continuing...")
+                step_result = StepResult("activate_window", True,  # Continue anyway
+                                      data={'hwnd': self.hwnd, 'rect': self.window_rect})
+            
+            self.step_results.append(step_result)
+            return step_result
+            
+        except Exception as e:
+            error = f"Window activation error: {e}"
+            logger.error(f"  ✗ {error}")
+            step_result = StepResult("activate_window", False, error=error)
+            self.step_results.append(step_result)
+            return step_result
     
-    def _type_instruction(self):
-        """
-        PLACEHOLDER: Type the instruction text.
+    def _step_3_find_assistant(self) -> StepResult:
+        """Step 3: Find Assistant button using template matching"""
+        logger.info("")
+        logger.info("[STEP 3/7] Finding Assistant button...")
         
-        Implementation:
-            import pyautogui
-            pyautogui.write(self.instruction, interval=0.05)
-        
-        Alternative (faster):
-            import pyperclip
-            import pyautogui
-            pyperclip.copy(self.instruction)
-            pyautogui.hotkey('ctrl', 'v')
-        """
-        logger.info(f"[PLACEHOLDER] Type: {self.instruction[:50]}...")
-        
-        # TODO: Implement
-        # import pyautogui
-        # pyautogui.write(self.instruction, interval=0.05)
+        try:
+            # Take screenshot
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            screenshot_path = self.screenshot_dir / f"assistant_button_{timestamp}.png"
+            
+            logger.info("  → Taking screenshot...")
+            screenshot = ScreenshotCapture.capture_window(self.window_rect, str(screenshot_path))
+            logger.info(f"  ✓ Screenshot saved: {screenshot_path.name}")
+            
+            # Template matching
+            template_path = self.template_dir / self.TEMPLATES['assistant_button']
+            threshold = self.THRESHOLDS['assistant_button']
+            
+            logger.info(f"  → Matching template: {template_path.name} (threshold={threshold})")
+            
+            coordinates = PatternMatcher.find_pattern(
+                str(screenshot_path),
+                str(template_path),
+                self.window_rect,
+                threshold
+            )
+            
+            if coordinates:
+                logger.info(f"  ✓ Assistant button found at: {coordinates}")
+                step_result = StepResult("find_assistant", True,
+                                      data={'coordinates': coordinates, 'confidence': 'matched'})
+            else:
+                error = "Assistant button not found in screenshot"
+                logger.error(f"  ✗ {error}")
+                step_result = StepResult("find_assistant", False, error=error)
+            
+            self.step_results.append(step_result)
+            return step_result
+            
+        except Exception as e:
+            error = f"Assistant button detection error: {e}"
+            logger.error(f"  ✗ {error}")
+            step_result = StepResult("find_assistant", False, error=error)
+            self.step_results.append(step_result)
+            return step_result
     
-    def _send_instruction(self):
-        """
-        PLACEHOLDER: Send the instruction.
+    def _step_4_click_assistant(self, coordinates: tuple) -> StepResult:
+        """Step 4: Click Assistant button"""
+        logger.info("")
+        logger.info("[STEP 4/7] Clicking Assistant button...")
         
-        Implementation (Option 1 - Click button):
-            import pyautogui
-            x, y = self.coordinates['send_button']
-            pyautogui.click(x, y)
-        
-        Implementation (Option 2 - Press key - RECOMMENDED):
-            import pyautogui
-            pyautogui.press('enter')
-        """
-        logger.info("[PLACEHOLDER] Send instruction (Enter key)")
-        
-        # TODO: Implement (Option 2 is more reliable)
-        # import pyautogui
-        # pyautogui.press('enter')
+        try:
+            x, y = coordinates
+            logger.info(f"  → Moving mouse to ({x}, {y})...")
+            
+            MouseController.move_to(x, y, duration=0.5)
+            time.sleep(0.2)
+            
+            logger.info("  → Clicking...")
+            MouseController.click()
+            
+            logger.info("  ✓ Assistant button clicked")
+            time.sleep(1)  # Wait for UI transition
+            
+            step_result = StepResult("click_assistant", True,
+                                   data={'clicked_at': coordinates})
+            self.step_results.append(step_result)
+            return step_result
+            
+        except Exception as e:
+            error = f"Click error: {e}"
+            logger.error(f"  ✗ {error}")
+            step_result = StepResult("click_assistant", False, error=error)
+            self.step_results.append(step_result)
+            return step_result
     
-    # ------------------------------------------------------------------------
-    # Completion Detection
-    # ------------------------------------------------------------------------
+    def _step_5_find_input_box(self) -> StepResult:
+        """Step 5: Find input box using template matching"""
+        logger.info("")
+        logger.info("[STEP 5/7] Finding input box...")
+        
+        try:
+            # Take new screenshot (UI has changed after clicking Assistant)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            screenshot_path = self.screenshot_dir / f"input_box_{timestamp}.png"
+            
+            logger.info("  → Taking screenshot...")
+            time.sleep(0.5)  # Wait for UI to settle
+            screenshot = ScreenshotCapture.capture_window(self.window_rect, str(screenshot_path))
+            logger.info(f"  ✓ Screenshot saved: {screenshot_path.name}")
+            
+            # Template matching
+            template_path = self.template_dir / self.TEMPLATES['input_box']
+            
+            # Check if template exists
+            if not template_path.exists():
+                logger.warning(f"  ⚠ Template not found: {template_path}")
+                logger.warning("  ⚠ Skipping input box detection, using click position")
+                # Fallback: click at center of window
+                left, top, right, bottom = self.window_rect
+                center_x = (left + right) // 2
+                center_y = (top + bottom) // 2
+                coordinates = (center_x, center_y)
+                
+                step_result = StepResult("find_input_box", True,
+                                      data={'coordinates': coordinates, 'method': 'fallback'})
+                self.step_results.append(step_result)
+                return step_result
+            
+            threshold = self.THRESHOLDS['input_box']
+            
+            logger.info(f"  → Matching template: {template_path.name} (threshold={threshold})")
+            
+            coordinates = PatternMatcher.find_pattern(
+                str(screenshot_path),
+                str(template_path),
+                self.window_rect,
+                threshold
+            )
+            
+            if coordinates:
+                logger.info(f"  ✓ Input box found at: {coordinates}")
+                step_result = StepResult("find_input_box", True,
+                                      data={'coordinates': coordinates, 'method': 'template'})
+            else:
+                # Fallback to center
+                logger.warning("  ⚠ Input box not found, using window center")
+                left, top, right, bottom = self.window_rect
+                center_x = (left + right) // 2
+                center_y = (top + bottom) // 2 + 100  # Slightly below center
+                coordinates = (center_x, center_y)
+                
+                step_result = StepResult("find_input_box", True,
+                                      data={'coordinates': coordinates, 'method': 'fallback'})
+            
+            self.step_results.append(step_result)
+            return step_result
+            
+        except Exception as e:
+            error = f"Input box detection error: {e}"
+            logger.error(f"  ✗ {error}")
+            step_result = StepResult("find_input_box", False, error=error)
+            self.step_results.append(step_result)
+            return step_result
+    
+    def _step_6_input_text(self, coordinates: tuple) -> StepResult:
+        """Step 6: Click input box and type prompt"""
+        logger.info("")
+        logger.info("[STEP 6/7] Inputting prompt text...")
+        
+        try:
+            x, y = coordinates
+            logger.info(f"  → Clicking input box at ({x}, {y})...")
+            
+            MouseController.click(x, y)
+            time.sleep(0.3)
+            
+            # Type text
+            logger.info(f"  → Typing text (length={len(self.instruction)})...")
+            logger.info(f"  → Text: {self.instruction[:50]}...")
+            
+            MouseController.type_text(self.instruction, interval=0.05)
+            
+            logger.info("  ✓ Text input completed")
+            time.sleep(0.5)
+            
+            step_result = StepResult("input_text", True,
+                                   data={'text_length': len(self.instruction)})
+            self.step_results.append(step_result)
+            return step_result
+            
+        except Exception as e:
+            error = f"Text input error: {e}"
+            logger.error(f"  ✗ {error}")
+            step_result = StepResult("input_text", False, error=error)
+            self.step_results.append(step_result)
+            return step_result
+    
+    def _step_7_send(self) -> StepResult:
+        """Step 7: Send instruction (press Enter)"""
+        logger.info("")
+        logger.info("[STEP 7/7] Sending instruction...")
+        
+        try:
+            logger.info("  → Pressing Enter key...")
+            
+            MouseController.press_key('enter')
+            
+            logger.info("  ✓ Instruction sent")
+            time.sleep(0.5)
+            
+            step_result = StepResult("send_instruction", True)
+            self.step_results.append(step_result)
+            return step_result
+            
+        except Exception as e:
+            error = f"Send error: {e}"
+            logger.error(f"  ✗ {error}")
+            step_result = StepResult("send_instruction", False, error=error)
+            self.step_results.append(step_result)
+            return step_result
+    
+    # ========================================================================
+    # PROGRESS TRACKING
+    # ========================================================================
+    
+    def get_automation_progress(self) -> Dict[str, Any]:
+        """
+        Get automation progress information.
+        
+        Returns:
+            Dict with progress details
+        """
+        total_steps = 7
+        completed_steps = len([r for r in self.step_results if r.success])
+        current_step = len(self.step_results) if len(self.step_results) < 7 else 7
+        
+        return {
+            'total_steps': total_steps,
+            'completed_steps': completed_steps,
+            'current_step': current_step,
+            'progress_percent': int((completed_steps / total_steps) * 100),
+            'step_details': [r.to_dict() for r in self.step_results]
+        }
+    
+    # ========================================================================
+    # COMPLETION DETECTION
+    # ========================================================================
     
     def check_completion(self) -> bool:
         """
         Check if AI task has completed.
         
-        Multi-level detection:
-        1. Process exit (simple fallback)
-        2. AI screenshot analysis (PLACEHOLDER)
-        
         Returns:
-            bool: True if task is complete
+            True if process exited
         """
-        # Level 1: Process exit
         if not self.is_process_running():
             logger.info(f"AITask {self.task_id} - process exited")
             return True
         
-        # Level 2: AI detection (PLACEHOLDER)
-        # if self._ai_detect_completion():
-        #     logger.info(f"AITask {self.task_id} - AI detected completion")
-        #     return True
-        
         return False
     
-    def _ai_detect_completion(self) -> bool:
-        """
-        PLACEHOLDER: AI-based completion detection.
-        
-        Implementation Steps:
-        1. Capture screenshot
-        2. Analyze with AI/CV
-        3. Return True if "done" pattern found
-        
-        Returns:
-            bool: True if AI detected completion
-        """
-        logger.debug(f"[PLACEHOLDER] AI detection for task {self.task_id}")
-        
-        # TODO: Implement
-        # screenshot = self._capture_screenshot()
-        # result = ai_model.predict(screenshot)
-        # return result.is_complete
-        
-        return False
-    
-    def _capture_screenshot(self):
-        """
-        PLACEHOLDER: Capture browser window screenshot.
-        
-        Implementation:
-            import win32gui
-            import win32ui
-            from PIL import Image
-            
-            # Find window by PID
-            hwnd = self._find_window_by_pid(self.process_id)
-            # Capture window content
-            screenshot = ...
-            return screenshot
-        
-        Returns:
-            PIL.Image or None
-        """
-        logger.debug("[PLACEHOLDER] Capture screenshot")
-        
-        # TODO: Implement
-        pass
-    
-    # ------------------------------------------------------------------------
-    # Serialization
-    # ------------------------------------------------------------------------
+    # ========================================================================
+    # SERIALIZATION
+    # ========================================================================
     
     def to_dict(self) -> Dict[str, Any]:
-        """
-        Serialize task to dictionary.
-        
-        Adds AI-specific fields to base representation.
-        """
+        """Serialize task to dictionary"""
         data = super().to_dict()
         data['instruction'] = self.instruction
-        data['coordinates'] = self.coordinates
+        data['automation_progress'] = self.get_automation_progress()
         return data
 
 
@@ -388,30 +541,18 @@ class AITask(BaseTask):
 # HELPER FUNCTIONS
 # ============================================================================
 
-def create_and_execute_ai_task(
-    instruction: str,
-    comet_path: str,
-    coordinates: Optional[Dict] = None
-) -> AITask:
+def create_and_execute_ai_task(instruction: str, comet_path: str) -> AITask:
     """
     Convenience function to create and execute AI task.
     
     Args:
         instruction: The AI instruction
-        comet_path: Path to browser
-        coordinates: Optional coordinate overrides
+        comet_path: Path to Comet browser
         
     Returns:
         AITask: The created and started task
-        
-    Example:
-        task = create_and_execute_ai_task(
-            instruction="Summarize this document",
-            comet_path="C:/path/to/comet.exe"
-        )
-        print(f"Task started: {task.task_id}")
     """
-    task = AITask(instruction, coordinates)
+    task = AITask(instruction)
     pid = task.execute(comet_path=comet_path)
     task.start(pid)
     return task
