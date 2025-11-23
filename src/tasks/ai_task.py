@@ -467,14 +467,24 @@ class AITask(BaseTask):
         logger.info("[STEP 7/7] Sending instruction...")
         
         try:
-            logger.info("  → Pressing Enter key...")
+            # Check if prompt starts with "/" (slash command)
+            is_slash_command = self.instruction.strip().startswith('/')
             
-            MouseController.press_key('enter')
+            if is_slash_command:
+                logger.info("  → Detected slash command, pressing Enter twice...")
+                MouseController.press_key('enter')
+                time.sleep(0.1)  # Small delay between presses
+                MouseController.press_key('enter')
+                logger.info("  ✓ Slash command sent (double Enter)")
+            else:
+                logger.info("  → Pressing Enter key...")
+                MouseController.press_key('enter')
+                logger.info("  ✓ Instruction sent")
             
-            logger.info("  ✓ Instruction sent")
             time.sleep(0.5)
             
-            step_result = StepResult("send_instruction", True)
+            step_result = StepResult("send_instruction", True, 
+                                    data={'slash_command': is_slash_command})
             self.step_results.append(step_result)
             return step_result
             

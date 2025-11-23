@@ -416,6 +416,12 @@ def start_task_monitor():
 # ============================================================================
 
 if __name__ == '__main__':
+    import atexit
+    from utils.cleanup import cleanup_temp_files
+    
+    # Register cleanup on normal exit
+    atexit.register(cleanup_temp_files)
+    
     logger.info("=" * 60)
     logger.info("Starting Comet Task Runner Backend")
     logger.info("=" * 60)
@@ -427,5 +433,11 @@ if __name__ == '__main__':
     # Start background monitoring thread
     start_task_monitor()
     
-    # Start Flask server
-    app.run(host='127.0.0.1', port=5000, debug=False)
+    try:
+        # Start Flask server
+        app.run(host='127.0.0.1', port=5000, debug=False)
+    except KeyboardInterrupt:
+        print("\n")
+        logger.info("Backend shutting down...")
+        cleanup_temp_files()
+        logger.info("Goodbye!")

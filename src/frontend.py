@@ -31,6 +31,30 @@ class CometRunnerApp:
         self.polling_active = True
         self.poll_thread = threading.Thread(target=self.poll_statuses, daemon=True)
         self.poll_thread.start()
+        
+        # Register cleanup on window close
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        
+        # Also register with atexit
+        import atexit
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent))
+        from utils.cleanup import cleanup_temp_files
+        atexit.register(cleanup_temp_files)
+    
+    def on_closing(self):
+        """Handle window close event"""
+        print("Frontend closing...")
+        try:
+            from pathlib import Path
+            sys.path.insert(0, str(Path(__file__).parent))
+            from utils.cleanup import cleanup_temp_files
+            cleanup_temp_files()
+        except Exception as e:
+            print(f"Cleanup error: {e}")
+        
+        self.polling_active = False  # Stop polling thread
+        self.root.destroy()
 
     def load_urls(self):
         if os.path.exists(URLS_FILE):
