@@ -16,7 +16,7 @@ class CometRunnerApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Comet Task Runner")
-        self.root.geometry("700x650")  # Increased height for AI section
+        self.root.geometry("1000x650")  # Increased width for status widget
         
         # Style
         self.style = ttk.Style()
@@ -24,7 +24,21 @@ class CometRunnerApp:
         
         self.urls = self.load_urls()
         
+        # Create main container with left and right panels
+        main_container = ttk.Frame(self.root)
+        main_container.pack(fill=tk.BOTH, expand=True)
+        
+        # Left panel (existing content)
+        self.left_panel = ttk.Frame(main_container)
+        self.left_panel.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Right panel (task status widget)
+        self.right_panel = ttk.LabelFrame(main_container, text="Task Queue Status", padding="10")
+        self.right_panel.pack(side=tk.RIGHT, fill=tk.BOTH, padx=10, pady=10)
+        self.right_panel.configure(width=300)
+        
         self.create_widgets()
+        self.create_status_widget()
         self.ensure_backend_running()
         
         # Start polling thread
@@ -82,14 +96,14 @@ class CometRunnerApp:
 
     def create_widgets(self):
         # Header
-        header_frame = ttk.Frame(self.root, padding="10")
+        header_frame = ttk.Frame(self.left_panel, padding="10")
         header_frame.pack(fill=tk.X)
         ttk.Label(header_frame, text="Comet Browser Task Runner", font=("Helvetica", 16, "bold")).pack(side=tk.LEFT)
         
         # ====================================================================
         # AI PROMPT SECTION (NEW!)
         # ====================================================================
-        ai_frame = ttk.LabelFrame(self.root, text="AI Assistant Task", padding="10")
+        ai_frame = ttk.LabelFrame(self.left_panel, text="AI Assistant Task", padding="10")
         ai_frame.pack(fill=tk.X, padx=10, pady=10)
         
         # AI Prompt label
@@ -121,7 +135,7 @@ class CometRunnerApp:
         # ====================================================================
         # URL SECTION
         # ====================================================================
-        url_section_frame = ttk.LabelFrame(self.root, text="URL Tasks", padding="10")
+        url_section_frame = ttk.LabelFrame(self.left_panel, text="URL Tasks", padding="10")
         url_section_frame.pack(fill=tk.BOTH, expand=True, padx=10)
         
         # Add URL Area
@@ -157,6 +171,28 @@ class CometRunnerApp:
         self.canvas.bind('<Configure>', self._on_canvas_configure)
 
         self.render_list()
+    
+    def create_status_widget(self):
+        """Create the task queue status widget in the right panel."""
+        # Scrollable canvas for task list
+        status_canvas = tk.Canvas(self.right_panel, highlightthickness=0)
+        status_scrollbar = ttk.Scrollbar(self.right_panel, orient="vertical", command=status_canvas.yview)
+        
+        self.status_frame = ttk.Frame(status_canvas)
+        
+        self.status_frame.bind(
+            "<Configure>",
+            lambda e: status_canvas.configure(scrollregion=status_canvas.bbox("all"))
+        )
+        
+        status_canvas.create_window((0, 0), window=self.status_frame, anchor="nw")
+        status_canvas.configure(yscrollcommand=status_scrollbar.set)
+        
+        status_canvas.pack(side="left", fill="both", expand=True)
+        status_scrollbar.pack(side="right", fill="y")
+        
+        # Initial empty message
+        ttk.Label(self.status_frame, text="No tasks yet", foreground="gray").pack(pady=20)
 
     def _on_canvas_configure(self, event):
         # Update the width of the scrollable_frame to match the canvas
@@ -239,7 +275,7 @@ class CometRunnerApp:
         threading.Thread(target=run_request, daemon=True).start()
     
     def execute_ai_task(self):
-        """Execute an AI task by calling the backend API."""
+        """Execute an AI task by calling the backend API (non-blocking)."""
         # Get prompt text
         prompt = self.ai_prompt_text.get("1.0", tk.END).strip()
         
@@ -247,9 +283,8 @@ class CometRunnerApp:
             messagebox.showwarning("No Prompt", "Please enter a prompt for the AI assistant.")
             return
         
-        # Disable button during execution
-        self.ai_execute_btn.configure(state=tk.DISABLED)
-        self.ai_status_var.set("Status: Executing...")
+        # Update status (non-blocking - button stays enabled)
+        self.ai_status_var.set("Status: Submitting...")
         
         def run_ai_request():
             try:
@@ -259,108 +294,223 @@ class CometRunnerApp:
                 if response.status_code == 200:
                     data = response.json()
                     task_id = data.get('task_id')
-                    print(f"Started AI task {task_id}")
+                    queue_position = data.get('queue_position', 0)
+                    status = data.get('status')
                     
-                    # Update status
-                    self.root.after(0, lambda: self.ai_status_var.set(f"Status: Running (Task: {task_id[:8]}...)"))
+                    print(f"Submitted AI task {task_id} (position: {queue_position})")
                     
-                    # Poll for completion
-                    self._poll_ai_task(task_id)
+                    # Update status based on queue position
+                    if status == "started":
+                        self.root.after(0, lambda: self.ai_status_var.set(f"Status: Running (Task: {task_id[:8]})"))
+                    else:
+                        self.root.after(0, lambda: self.ai_status_var.set(f"Status: Queued (Position: {queue_position + 1})"))
+                    
+                    # Clear input after successful submission
+                    self.root.after(0, lambda: self.ai_prompt_text.delete("1.0", tk.END))
                 else:
                     print(f"Error executing AI task: {response.text}")
                     self.root.after(0, lambda: messagebox.showerror("Error", f"Failed to execute: {response.text}"))
                     self.root.after(0, lambda: self.ai_status_var.set("Status: Error"))
-                    self.root.after(0, lambda: self.ai_execute_btn.configure(state=tk.NORMAL))
             except Exception as e:
                 print(f"Connection error: {e}")
                 self.root.after(0, lambda: messagebox.showerror("Connection Error", "Could not connect to backend."))
                 self.root.after(0, lambda: self.ai_status_var.set("Status: Connection Error"))
-                self.root.after(0, lambda: self.ai_execute_btn.configure(state=tk.NORMAL))
         
         threading.Thread(target=run_ai_request, daemon=True).start()
-    
-    def _poll_ai_task(self, task_id):
-        """Poll AI task status until completion"""
-        def poll():
-            try:
-                response = requests.get(f"{BACKEND_URL}/status/{task_id}")
-                if response.status_code == 200:
-                    data = response.json()
-                    status = data.get('status')
-                    
-                    # Get automation progress if available
-                    automation_progress = data.get('automation_progress', {})
-                    completed_steps = automation_progress.get('completed_steps', 0)
-                    total_steps = automation_progress.get('total_steps', 7)
-                    
-                    if status == "running":
-                        self.root.after(0, lambda: self.ai_status_var.set(
-                            f"Status: Running - Step {completed_steps}/{total_steps}"
-                        ))
-                        # Continue polling
-                        threading.Timer(1.0, poll).start()
-                    elif status == "done":
-                        self.root.after(0, lambda: self.ai_status_var.set("Status: ✓ Completed"))
-                        self.root.after(0, lambda: self.ai_execute_btn.configure(state=tk.NORMAL))
-                        self.root.after(0, lambda: messagebox.showinfo("Success", "AI task completed successfully!"))
-                    elif status == "failed":
-                        error_msg = data.get('error_message', 'Unknown error')
-                        self.root.after(0, lambda: self.ai_status_var.set(f"Status: ✗ Failed"))
-                        self.root.after(0, lambda: self.ai_execute_btn.configure(state=tk.NORMAL))
-                        self.root.after(0, lambda: messagebox.showerror("Task Failed", f"Error: {error_msg}"))
-                    else:
-                        # Continue polling for other statuses
-                        threading.Timer(1.0, poll).start()
-            except:
-                # Retry on connection error
-                threading.Timer(2.0, poll).start()
-        
-        poll()
 
 
     def poll_statuses(self):
+        """Poll /manager/status endpoint for complete queue state."""
+        print("🔄 Frontend polling thread started")
+        
         while self.polling_active:
-            time.sleep(1) # Poll every 1 second
-            updated = False
-            for item in self.urls:
-                if item['task_id'] and item['status'] == "running":
-                    try:
-                        response = requests.get(f"{BACKEND_URL}/status/{item['task_id']}")
-                        if response.status_code == 200:
-                            data = response.json()
-                            new_status = data.get('status')
-                            if new_status and new_status != item['status']:
-                                item['status'] = new_status
-                                updated = True
-                    except:
-                        pass # Ignore connection errors during polling
+            time.sleep(1)  # Poll every 1 second
             
-            if updated:
-                self.root.after(0, self.render_list)
+            try:
+                # Poll the manager status endpoint (single API call for all tasks)
+                response = requests.get(f"{BACKEND_URL}/manager/status", timeout=2)
+                if response.status_code == 200:
+                    manager_data = response.json()
+                    
+                    # Debug logging
+                    print("=" * 60)
+                    print("📡 FRONTEND RECEIVED DATA FROM BACKEND:")
+                    print(f"  Current: {manager_data.get('current', {}).get('task_id', 'None')[:8] if manager_data.get('current') else 'None'}")
+                    print(f"  Queued: {len(manager_data.get('queued', []))} tasks")
+                    print(f"  Completed: {len(manager_data.get('completed', []))} tasks")
+                    print("=" * 60)
+                    
+                    # Update status widget
+                    self.root.after(0, lambda data=manager_data: self.update_status_widget(data))
+                    
+                    # Also update URL task statuses (backwards compatibility)
+                    self._update_url_statuses(manager_data)
+                else:
+                    print(f"❌ Backend returned status code: {response.status_code}")
+            except Exception as e:
+                print(f"❌ Polling error: {e}")
+                pass  # Ignore connection errors during polling
+    
+    def _update_url_statuses(self, manager_data):
+        """Update URL task statuses from manager data (backwards compatibility)."""
+        # Get all tasks from manager
+        all_tasks = []
+        if manager_data.get('current'):
+            all_tasks.append(manager_data['current'])
+        all_tasks.extend(manager_data.get('queued', []))
+        all_tasks.extend(manager_data.get('completed', []))
+        
+        # Update URL items
+        updated = False
+        for item in self.urls:
+            if item['task_id']:
+                # Find matching task in manager data
+                for task in all_tasks:
+                    if task['task_id'] == item['task_id']:
+                        new_status = task['status']
+                        if new_status != item['status']:
+                            item['status'] = new_status
+                            updated = True
+                        break
+        
+        if updated:
+            self.root.after(0, self.render_list)
+    
+    def update_status_widget(self, manager_data):
+        """Update the task status widget with current queue state."""
+        print(f"🖼️  RENDERING STATUS WIDGET")
+        
+        # Clear current widget
+        for widget in self.status_frame.winfo_children():
+            widget.destroy()
+        
+        current_task = manager_data.get('current')
+        queued_tasks = manager_data.get('queued', [])
+        completed_tasks = manager_data.get('completed', [])
+        
+        print(f"  Rendering {1 if current_task else 0} current + {len(queued_tasks)} queued + {len(completed_tasks)} completed")
+        
+        # Show current task
+        if current_task:
+            print(f"  → Rendering current: {current_task.get('task_id')[:8]}")
+            self._render_task_item(current_task, is_current=True)
+        
+        # Show queued tasks
+        for task in queued_tasks:
+            print(f"  → Rendering queued: {task.get('task_id')[:8]}")
+            self._render_task_item(task, is_queued=True)
+        
+        # Show completed tasks
+        for task in completed_tasks:
+            print(f"  → Rendering completed: {task.get('task_id')[:8]}")
+            self._render_task_item(task, is_completed=True)
+        
+        # If no tasks, show empty message
+        if not current_task and not queued_tasks and not completed_tasks:
+            print("  → No tasks, showing empty message")
+            ttk.Label(self.status_frame, text="No tasks yet", foreground="gray").pack(pady=20)
+    
+    def _render_task_item(self, task, is_current=False, is_queued=False, is_completed=False):
+        """Render a single task item in the status widget."""
+        # Get task info
+        task_type = task.get('task_type', 'unknown')
+        
+        # For AI tasks, show prompt (truncated)
+        if task_type == "ai":
+            prompt = task.get('instruction', 'Unknown')
+            # Truncate long prompts
+            if len(prompt) > 30:
+                display_text = prompt[:27] + "..."
+            else:
+                display_text = prompt
+        else:
+            # For URL tasks, show URL
+            url = task.get('url', 'Unknown')
+            if len(url) > 30:
+                display_text = url[:27] + "..."
+            else:
+                display_text = url
+        
+        # Determine status and colors
+        if is_current:
+            # Running task - Yellow/Orange background
+            if task_type == "ai":
+                automation_progress = task.get('automation_progress', {})
+                current_step = automation_progress.get('current_step', 0)
+                total_steps = automation_progress.get('total_steps', 7)
+                status_text = f"Step {current_step}/{total_steps}"
+            else:
+                status_text = "Running"
+            
+            arrow = "→ "
+            bg_color = "#FFD700"  # Gold/Yellow
+            fg_color = "black"
+            font_weight = "bold"
+            
+        elif is_queued:
+            # Queued task - Light gray
+            arrow = "  "
+            status_text = "Queued"
+            bg_color = "#F0F0F0"  # Light gray background
+            fg_color = "#666666"  # Dark gray text
+            font_weight = "normal"
+            
+        elif is_completed:
+            # Completed task
+            arrow = "  "
+            if task.get('status') == 'done':
+                status_text = "✓ Done"
+                bg_color = "#90EE90"  # Light green  
+                fg_color = "#006400"  # Dark green text
+            else:
+                status_text = "✗ Failed"
+                bg_color = "#FFB6C1"  # Light red/pink
+                fg_color = "#8B0000"  # Dark red text
+            font_weight = "normal"
+        else:
+            arrow = "  "
+            status_text = "Unknown"
+            bg_color = "#FFFFFF"
+            fg_color = "black"
+            font_weight = "normal"
+        
+        # Create frame for this task
+        item_frame = tk.Frame(self.status_frame, bg=bg_color, relief="ridge", bd=1)
+        item_frame.pack(fill=tk.X, padx=5, pady=3)
+        
+        # Top line: Arrow + Prompt/URL
+        top_label = tk.Label(
+            item_frame,
+            text=f"{arrow}{display_text}",
+            anchor="w",
+            font=("Segoe UI", 9, font_weight),
+            bg=bg_color,
+            fg=fg_color,
+            padx=6,
+            pady=3
+        )
+        top_label.pack(fill=tk.X)
+        
+        # Bottom line: Status
+        status_label = tk.Label(
+            item_frame,
+            text=f"    {status_text}",  # Indent status
+            anchor="w",
+            font=("Segoe UI", 8),
+            bg=bg_color,
+            fg=fg_color,
+            padx=6,
+            pady=2
+        )
+        status_label.pack(fill=tk.X)
 
     def ensure_backend_running(self):
         try:
             requests.get(f"{BACKEND_URL}/health", timeout=1)
             print("Backend is already running.")
         except requests.ConnectionError:
-            print("Backend not running. Launching...")
-            
-            if sys.platform == "win32":
-                # Try to use Windows Terminal (wt) first, then PowerShell, then CMD
-                backend_script = os.path.join(os.path.dirname(__file__), "backend.py")
-                if shutil.which("wt"):
-                    print("Launching in Windows Terminal...")
-                    subprocess.Popen(["wt", "new-tab", "--title", "Comet Backend", "python", backend_script])
-                elif shutil.which("powershell"):
-                    print("Launching in PowerShell...")
-                    subprocess.Popen(["start", "powershell", "-NoExit", "-Command", f"python {backend_script}"], shell=True)
-                else:
-                    print("Launching in CMD...")
-                    subprocess.Popen(["start", "cmd", "/k", "python", backend_script], shell=True)
-            else:
-                subprocess.Popen(["python", "backend.py"])
-            
-            time.sleep(2)
+            print("Backend not running. Please start it manually.")
+            print("Run: python src\\backend.py")
 
 if __name__ == "__main__":
     root = tk.Tk()

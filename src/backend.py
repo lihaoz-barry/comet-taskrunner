@@ -32,6 +32,9 @@ from tasks import BaseTask, TaskStatus, TaskType, URLTask, AITask
 # Import task manager (storage layer)
 from task_manager import TaskManager
 
+# Import task queue (sequential execution manager)
+from task_queue import TaskQueue
+
 # ============================================================================
 # APP INITIALIZATION
 # ============================================================================
@@ -48,6 +51,10 @@ logger = logging.getLogger(__name__)
 # Initialize the global Task Manager
 # This manages ALL tasks (both URL and AI) in memory
 task_manager = TaskManager()
+
+# Initialize the global Task Queue
+# This coordinates sequential task execution (one at a time)
+task_queue = None  # Will be initialized after getting comet_path
 
 
 # ============================================================================
@@ -125,20 +132,18 @@ def execute_url():
     
     Response:
         {
-            "status": "started",
+            "status": "queued" or "started",
             "task_id": "uuid",
             "task_type": "url",
-            "process_id": 12345
+            "queue_position": 0 or N
         }
     
     Workflow:
         1. Validate URL parameter
         2. Check Comet browser availability
         3. Create URLTask object
-        4. Execute task (launch browser)
-        5. Capture process ID
-        6. Start task monitoring
-        7. Return task info to client
+        4. Submit to TaskQueue
+        5. Return task info to client
     """
     # Step 1: Validate input
     data = request.json
@@ -148,37 +153,37 @@ def execute_url():
         logger.warning("URL task requested without URL parameter")
         return jsonify({"error": "URL is required"}), 400
 
-    # Step 2: Check Comet availability
-    comet_path = get_comet_path()
-    if not comet_path:
-        return jsonify({"error": "Comet browser not found"}), 500
+    # Step 2: Check task queue initialization
+    if task_queue is None:
+        return jsonify({"error": "Task queue not initialized"}), 500
 
     # Step 3: Create task object
-    # This creates a NEW ExecutionJob in memory
     task = task_manager.create_url_task(url)
     logger.info(f"Created URL task {task.task_id} for: {url}")
 
     try:
-        # Step 4 & 5: Execute and capture PID
-        process_id = task.execute(comet_path=comet_path)
+        # Step 4: Submit to queue (non-blocking)
+        task_queue.submit(task)
         
-        # Step 6: Start task (sets status to RUNNING)
-        task.start(process_id)
+        # Get queue status to determine position
+        queue_status = task_queue.get_status()
+        is_current = queue_status['current'] and queue_status['current']['task_id'] == task.task_id
+        queue_position = 0 if is_current else len([t for t in queue_status['queued'] if t['task_id'] == task.task_id])
         
-        logger.info(f"URL task {task.task_id} started with PID {process_id}")
+        logger.info(f"URL task {task.task_id} submitted to queue (position: {queue_position})")
         
-        # Step 7: Return success response
+        # Step 5: Return success response
         return jsonify({
-            "status": "started",
+            "status": "started" if is_current else "queued",
             "task_id": task.task_id,
             "task_type": "url",
-            "process_id": process_id,
-            "message": "URL task started successfully"
+            "queue_position": queue_position,
+            "message": "URL task queued successfully" if not is_current else "URL task started"
         }), 200
         
     except Exception as e:
-        # Handle execution failures
-        logger.error(f"Failed to execute URL task: {e}")
+        # Handle submission failures
+        logger.error(f"Failed to submit URL task: {e}")
         task.fail(str(e))
         return jsonify({"error": str(e)}), 500
 
@@ -204,21 +209,18 @@ def execute_ai():
     
     Response:
         {
-            "status": "started",
+            "status": "queued" or "started",
             "task_id": "uuid",
             "task_type": "ai",
-            "process_id": 12345,
-            "instruction": "Please summarize..."
+            "instruction": "Please summarize...",
+            "queue_position": 0 or N
         }
     
     Workflow:
         1. Validate instruction parameter
-        2. Check Comet browser availability
-        3. Create AITask object
-        4. Execute task (launch browser + automation sequence)
-        5. Capture process ID
-        6. Start task monitoring
-        7. Return task info to client
+        2. Create AITask object
+        3. Submit to TaskQueue
+        4. Return task info to client
     
     Note:
         The automation sequence runs in a background thread:
@@ -226,8 +228,6 @@ def execute_ai():
         - Click task input box
         - Type instruction
         - Click Send button
-        
-        These are currently PLACEHOLDERS - see task_manager.py AITask class
     """
     # Step 1: Validate input
     data = request.json
@@ -238,38 +238,37 @@ def execute_ai():
         logger.warning("AI task requested without instruction")
         return jsonify({"error": "instruction is required"}), 400
 
-    # Step 2: Check Comet availability
-    comet_path = get_comet_path()
-    if not comet_path:
-        return jsonify({"error": "Comet browser not found"}), 500
+    # Step 2: Check task queue initialization
+    if task_queue is None:
+        return jsonify({"error": "Task queue not initialized"}), 500
 
     # Step 3: Create AI task object
-    # This creates a NEW AITask in memory with automation logic
     task = task_manager.create_ai_task(instruction, coordinates)
     logger.info(f"Created AI task {task.task_id}: {instruction[:50]}...")
 
     try:
-        # Step 4 & 5: Execute AI automation and capture PID
-        # The automation (mouse clicks, typing) happens in a background thread
-        process_id = task.execute(comet_path=comet_path)
+        # Step 4: Submit to queue (non-blocking)
+        task_queue.submit(task)
         
-        # Step 6: Start task
-        task.start(process_id)
+        # Get queue status to determine position
+        queue_status = task_queue.get_status()
+        is_current = queue_status['current'] and queue_status['current']['task_id'] == task.task_id
+        queue_position = 0 if is_current else len([t for t in queue_status['queued'] if t['task_id'] == task.task_id])
         
-        logger.info(f"AI task {task.task_id} started with PID {process_id}")
+        logger.info(f"AI task {task.task_id} submitted to queue (position: {queue_position})")
         
-        # Step 7: Return success response
+        # Step 5: Return success response
         return jsonify({
-            "status": "started",
+            "status": "started" if is_current else "queued",
             "task_id": task.task_id,
             "task_type": "ai",
-            "process_id": process_id,
             "instruction": instruction,
-            "message": "AI task started, automation sequence initiated"
+            "queue_position": queue_position,
+            "message": "AI task queued successfully" if not is_current else "AI task started"
         }), 200
         
     except Exception as e:
-        logger.error(f"Failed to execute AI task: {e}")
+        logger.error(f"Failed to submit AI task: {e}")
         task.fail(str(e))
         return jsonify({"error": str(e)}), 500
 
@@ -326,6 +325,8 @@ def get_status(task_id):
         response['url'] = task.url
     elif task.task_type == TaskType.AI_ASSISTANT:
         response['instruction'] = task.instruction
+        # Add automation progress for AI tasks
+        response['automation_progress'] = task.get_automation_progress()
     
     return jsonify(response), 200
 
@@ -362,6 +363,28 @@ def callback():
         return jsonify({"status": "updated"}), 200
     else:
         return jsonify({"error": "Task ID not found"}), 404
+
+
+@app.route('/manager/status', methods=['GET'])
+def get_manager_status():
+    """
+    Get complete task queue status.
+    
+    This is the main endpoint for UI polling.
+    Returns current executing task, queued tasks, and recently completed.
+    
+    Returns:
+        {
+            'current': {...} or None,
+            'queued': [...],
+            'completed': [...],
+            'stats': {...}
+        }
+    """
+    if task_queue is None:
+        return jsonify({'error': 'Task queue not initialized'}), 500
+    
+    return jsonify(task_queue.get_status()), 200
 
 
 @app.route('/jobs', methods=['GET'])
@@ -425,9 +448,20 @@ if __name__ == '__main__':
     logger.info("=" * 60)
     logger.info("Starting Comet Task Runner Backend")
     logger.info("=" * 60)
+    
+    # Initialize TaskQueue with comet_path
+    # Note: task_queue is already declared at module level (line 57)
+    comet_path = get_comet_path()
+    if comet_path:
+        task_queue = TaskQueue(comet_path)
+        logger.info(f"✓ TaskQueue initialized with Comet path: {comet_path}")
+    else:
+        logger.warning("⚠ Comet browser not found, TaskQueue not initialized")
+    
     logger.info("URL Task API: POST /execute/url")
     logger.info("AI Task API:  POST /execute/ai")
     logger.info("Status API:   GET /status/<task_id>")
+    logger.info("Manager API:  GET /manager/status")
     logger.info("=" * 60)
     
     # Start background monitoring thread
@@ -439,5 +473,7 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print("\n")
         logger.info("Backend shutting down...")
+        if task_queue:
+            task_queue.shutdown()
         cleanup_temp_files()
         logger.info("Goodbye!")

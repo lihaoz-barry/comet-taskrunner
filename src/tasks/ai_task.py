@@ -104,6 +104,9 @@ class AITask(BaseTask):
         self.screenshot_dir = Path(__file__).parent.parent.parent / "screenshots"
         self.screenshot_dir.mkdir(exist_ok=True)
         
+        # Track automation completion (not just process)
+        self.automation_completed = False
+        
         logger.info(f"AITask created with instruction: {instruction[:50]}...")
         logger.info(f"Template directory: {self.template_dir}")
     
@@ -200,12 +203,17 @@ class AITask(BaseTask):
             logger.info("✓ AUTOMATION SEQUENCE COMPLETED SUCCESSFULLY")
             logger.info("="*60)
             
+            # Mark automation as completed
+            self.automation_completed = True
+            
         except Exception as e:
             error_msg = f"Automation sequence failed: {e}"
             logger.error(f"✗ {error_msg}")
             import traceback
             traceback.print_exc()
             self.fail(error_msg)
+            # Mark automation as completed (even if failed)
+            self.automation_completed = True
     
     # ========================================================================
     # AUTOMATION STEPS
@@ -526,14 +534,14 @@ class AITask(BaseTask):
         """
         Check if AI task has completed.
         
-        Returns:
-            True if process exited
-        """
-        if not self.is_process_running():
-            logger.info(f"AITask {self.task_id} - process exited")
-            return True
+        For AI tasks, completion means automation sequence finished,
+        not just process exit (browser detaches immediately).
         
-        return False
+        Returns:
+            True if automation sequence completed
+        """
+        # AI tasks complete when automation finishes, not when process exits
+        return self.automation_completed
     
     # ========================================================================
     # SERIALIZATION
