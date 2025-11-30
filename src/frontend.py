@@ -106,12 +106,25 @@ class CometRunnerApp:
         ai_frame = ttk.LabelFrame(self.left_panel, text="AI Assistant Task", padding="10")
         ai_frame.pack(fill=tk.X, padx=10, pady=10)
         
-        # AI Prompt label
-        ttk.Label(ai_frame, text="Prompt:", font=("Helvetica", 10, "bold")).pack(anchor=tk.W)
+        # AI Prompt label with shortcut hints
+        prompt_label_text = "Prompt: (Enter to submit, Shift+Enter for new line)"
+        ttk.Label(ai_frame, text=prompt_label_text, font=("Helvetica", 10, "bold")).pack(anchor=tk.W)
         
         # AI Prompt input (multi-line text box)
         self.ai_prompt_text = tk.Text(ai_frame, height=3, wrap=tk.WORD)
         self.ai_prompt_text.pack(fill=tk.X, pady=(5, 10))
+        
+        # Bind keyboard shortcuts
+        def on_enter_key(event):
+            # Check if Shift is held (event.state & 0x1 for Shift)
+            if event.state & 0x1:  # Shift key is pressed
+                return  # Allow default behavior (insert newline)
+            else:
+                # Submit the task
+                self.execute_ai_task()
+                return "break"  # Prevent default newline insertion
+        
+        self.ai_prompt_text.bind("<Return>", on_enter_key)
         
         # AI Execute button frame
         ai_btn_frame = ttk.Frame(ai_frame)

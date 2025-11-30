@@ -46,3 +46,4 @@ screenshots/
 
 # Test files
 test_*.py.log
+openCV-sample.code-workspace
