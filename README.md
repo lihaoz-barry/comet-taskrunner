@@ -30,14 +30,22 @@ A Python-based automation tool for Comet Browser with support for URL navigation
 
 ## How to Run
 
-### Option 1: Smart Launcher (Recommended)
+### Option 1: Development Mode (Recommended for Debugging)
 Double-click **`start.bat`** file.
+- **Frontend**: Separate terminal window (logs visible)
+- **Backend**: Separate terminal window (logs visible)
 - Automatically detects and uses the best available terminal (Windows Terminal → PowerShell → CMD)
 - Checks and installs dependencies
-- Launches frontend and backend in **separate terminal windows** for easy monitoring
-- Automatically detects and prefers `backend.exe` if available
+- **Best for**: Development, debugging, troubleshooting
 
-### Option 2: Manual
+### Option 2: Background Mode (Recommended for Daily Use)
+Double-click **`start_background.bat`** file.
+- **Frontend**: Hidden (no console, runs with pythonw)
+- **Backend**: Separate terminal window (logs visible)
+- Cleaner desktop with fewer windows
+- **Best for**: Normal usage, production
+
+### Option 3: Manual
 1. Start backend:
    ```bash
    python src/backend.py
