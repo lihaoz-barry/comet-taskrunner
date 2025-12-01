@@ -2,14 +2,15 @@
 setlocal enabledelayedexpansion
 
 REM ============================================================
-REM  Comet Task Runner - Smart Launcher
-REM  Automatically detects and uses the best available terminal
+REM  Comet Task Runner - Background Mode Launcher
+REM  Backend: Visible terminal with logs
+REM  Frontend: Hidden (pythonw, no console)
 REM  Priority: Windows Terminal → PowerShell → CMD
 REM ============================================================
 
 echo.
 echo ============================================================
-echo  Comet Task Runner - Starting...
+echo  Comet Task Runner - Starting (Background Mode)
 echo ============================================================
 echo.
 
@@ -18,6 +19,7 @@ set "SCRIPT_DIR=%~dp0"
 cd /d "%SCRIPT_DIR%"
 
 echo [INFO] Working directory: %CD%
+echo [INFO] Mode: Background (Frontend hidden, Backend visible)
 echo.
 
 REM ===== Detect Best Terminal =====
@@ -50,7 +52,7 @@ echo [INFO] Using CMD ^(fallback^)
 echo.
 
 REM ===== Check Dependencies =====
-echo [1/4] Checking Python dependencies...
+echo [1/3] Checking Python dependencies...
 echo.
 
 REM Silent install to avoid clutter (show errors only)
@@ -73,12 +75,12 @@ if exist "dist\backend.exe" (
     set "BACKEND_VERSION=Packaged .exe"
     echo [INFO] Found packaged backend.exe - using standalone version
 ) else (
-    echo [INFO "No backend.exe found - using Python script
+    echo [INFO] No backend.exe found - using Python script
 )
 echo.
 
 REM ===== Start Backend =====
-echo [2/4] Starting Backend ^(%BACKEND_VERSION%^)...
+echo [2/3] Starting Backend ^(%BACKEND_VERSION%^)...
 echo.
 
 if "%TERMINAL%"=="wt.exe" (
@@ -96,27 +98,19 @@ echo [OK] Backend launched in %TERMINAL_NAME%
 echo.
 
 REM ===== Wait for Backend =====
-echo [3/4] Waiting for backend to initialize...
+echo [3/3] Waiting for backend to initialize...
 timeout /t 3 /nobreak >nul
 echo [OK] Backend should be ready
 echo.
 
-REM ===== Start Frontend =====
-echo [4/4] Starting Frontend...
+REM ===== Start Frontend (HIDDEN - No Console) =====
+echo Starting Frontend (background mode - no console)...
 echo.
 
-if "%TERMINAL%"=="wt.exe" (
-    REM Windows Terminal - open in NEW WINDOW (not tab)
-    start "" wt.exe -w new --title "Comet Frontend" cmd /k "cd /d %CD% && echo Frontend starting... && echo. && python src\frontend.py"
-) else if "%TERMINAL%"=="powershell.exe" (
-    REM PowerShell - open in new window
-    start "Comet Frontend" powershell.exe -NoExit -Command "cd '%CD%'; Write-Host 'Frontend starting...' -ForegroundColor Cyan; python src\frontend.py"
-) else (
-    REM CMD - open in new window
-    start "Comet Frontend" cmd /k "cd /d %CD% && echo Frontend starting... && echo. && python src\frontend.py"
-)
+REM Use pythonw to launch without console window
+start "" pythonw src\frontend.py
 
-echo [OK] Frontend launched in %TERMINAL_NAME%
+echo [OK] Frontend launched in background (no console)
 echo.
 
 REM ===== Success =====
@@ -124,9 +118,12 @@ echo ============================================================
 echo  SUCCESS! Comet Task Runner is now running
 echo ============================================================
 echo.
-echo  - Backend: Running in separate %TERMINAL_NAME% window
-echo  - Frontend: Running in separate %TERMINAL_NAME% window
-echo  - You can close this window now
+echo  - Backend: Running in %TERMINAL_NAME% window (logs visible)
+echo  - Frontend: Running in background (no console)
 echo.
-echo  Press any key to exit...
-pause >nul
+echo  To see frontend, check your taskbar for the GUI window
+echo  To stop: Close backend terminal and frontend GUI
+echo.
+echo  You can close this window now
+echo.
+pause

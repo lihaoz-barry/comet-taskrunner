@@ -106,12 +106,25 @@ class CometRunnerApp:
         ai_frame = ttk.LabelFrame(self.left_panel, text="AI Assistant Task", padding="10")
         ai_frame.pack(fill=tk.X, padx=10, pady=10)
         
-        # AI Prompt label
-        ttk.Label(ai_frame, text="Prompt:", font=("Helvetica", 10, "bold")).pack(anchor=tk.W)
+        # AI Prompt label with shortcut hints
+        prompt_label_text = "Prompt: (Enter to submit, Shift+Enter for new line)"
+        ttk.Label(ai_frame, text=prompt_label_text, font=("Helvetica", 10, "bold")).pack(anchor=tk.W)
         
         # AI Prompt input (multi-line text box)
         self.ai_prompt_text = tk.Text(ai_frame, height=3, wrap=tk.WORD)
         self.ai_prompt_text.pack(fill=tk.X, pady=(5, 10))
+        
+        # Bind keyboard shortcuts
+        def on_enter_key(event):
+            # Check if Shift is held (event.state & 0x1 for Shift)
+            if event.state & 0x1:  # Shift key is pressed
+                return  # Allow default behavior (insert newline)
+            else:
+                # Submit the task
+                self.execute_ai_task()
+                return "break"  # Prevent default newline insertion
+        
+        self.ai_prompt_text.bind("<Return>", on_enter_key)
         
         # AI Execute button frame
         ai_btn_frame = ttk.Frame(ai_frame)
@@ -343,6 +356,9 @@ class CometRunnerApp:
                     # Update status widget
                     self.root.after(0, lambda data=manager_data: self.update_status_widget(data))
                     
+                    # Update AI status based on task state
+                    self.root.after(0, lambda data=manager_data: self._update_ai_status(data))
+                    
                     # Also update URL task statuses (backwards compatibility)
                     self._update_url_statuses(manager_data)
                 else:
@@ -375,6 +391,43 @@ class CometRunnerApp:
         
         if updated:
             self.root.after(0, self.render_list)
+    
+    def _update_ai_status(self, manager_data):
+        """Update AI task status display based on manager data."""
+        # Get current AI status text to see if we have a task ID tracked
+        current_status = self.ai_status_var.get()
+        
+        # Extract task ID from current status if present
+        if "Task:" in current_status:
+            # Format is "Status: Running (Task: 12345678)"
+            task_id_short = current_status.split("Task: ")[1].rstrip(")")
+            
+            # Find this task in manager data
+            all_tasks = []
+            if manager_data.get('current'):
+                all_tasks.append(manager_data['current'])
+            all_tasks.extend(manager_data.get('queued', []))
+            all_tasks.extend(manager_data.get('completed', []))
+            
+            for task in all_tasks:
+                if task.get('task_type') == 'ai' and task.get('task_id', '')[:8] == task_id_short:
+                    # Update status based on task state
+                    task_status = task.get('status')
+                    if task_status == 'done':
+                        self.ai_status_var.set(f"Status: ✓ Done (Task: {task_id_short})")
+                    elif task_status == 'failed':
+                        self.ai_status_var.set(f"Status: ✗ Failed (Task: {task_id_short})")
+                    elif task_status == 'running':
+                        # Check if it's current or queued
+                        if manager_data.get('current') and manager_data['current'].get('task_id', '')[:8] == task_id_short:
+                            self.ai_status_var.set(f"Status: Running (Task: {task_id_short})")
+                        else:
+                            # Still queued
+                            queue_pos = next((i for i, t in enumerate(manager_data.get('queued', [])) 
+                                            if t.get('task_id', '')[:8] == task_id_short), -1)
+                            if queue_pos >= 0:
+                                self.ai_status_var.set(f"Status: Queued (Position: {queue_pos + 1})")
+                    break
     
     def update_status_widget(self, manager_data):
         """Update the task status widget with current queue state."""
@@ -503,6 +556,21 @@ class CometRunnerApp:
             pady=2
         )
         status_label.pack(fill=tk.X)
+        
+        # Third line: Task ID (small, gray text)
+        task_id = task.get('task_id', 'unknown')
+        task_id_short = task_id[:8] if len(task_id) >= 8 else task_id
+        id_label = tk.Label(
+            item_frame,
+            text=f"    ID: {task_id_short}",
+            anchor="w",
+            font=("Segoe UI", 7),
+            bg=bg_color,
+            fg="#888888",  # Gray color
+            padx=6,
+            pady=1
+        )
+        id_label.pack(fill=tk.X)
 
     def ensure_backend_running(self):
         try:

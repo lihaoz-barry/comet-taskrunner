@@ -30,16 +30,32 @@ A Python-based automation tool for Comet Browser with support for URL navigation
 
 ## How to Run
 
-### Option 1: One-Click Launcher (Recommended)
-Double-click the **`run_app.bat`** file. 
-- This will install dependencies (if missing) and launch the application.
+### Option 1: Development Mode (Recommended for Debugging)
+Double-click **`start.bat`** file.
+- **Frontend**: Separate terminal window (logs visible)
+- **Backend**: Separate terminal window (logs visible)
+- Automatically detects and uses the best available terminal (Windows Terminal → PowerShell → CMD)
+- Checks and installs dependencies
+- **Best for**: Development, debugging, troubleshooting
 
-### Option 2: Manual
-1.  Run the frontend:
-    ```bash
-    python frontend.py
-    ```
-2.  The Frontend will automatically check if the Backend is running. If not, it will launch the Backend in a separate terminal window.
+### Option 2: Background Mode (Recommended for Daily Use)
+Double-click **`start_background.bat`** file.
+- **Frontend**: Hidden (no console, runs with pythonw)
+- **Backend**: Separate terminal window (logs visible)
+- Cleaner desktop with fewer windows
+- **Best for**: Normal usage, production
+
+### Option 3: Manual
+1. Start backend:
+   ```bash
+   python src/backend.py
+   # Or if you have the packaged version:
+   dist/backend.exe
+   ```
+2. Start frontend (in a separate terminal):
+   ```bash
+   python src/frontend.py
+   ```
 
 ## Architecture
 
@@ -109,11 +125,15 @@ You might notice the Frontend constantly sending requests to the Backend. This i
 
 ### GUI Usage
 
-1.  **Add URL**: Type a URL and click "Add URL"
-2.  **Execute**: Click "Execute" next to a URL
-    - **Yellow**: Task is running
-    - **Green**: Task completed successfully
-3.  **Remove**: Click "Remove" to delete a URL
+1. **Add URL**: Type a URL and click "Add URL"
+2. **Execute URL**: Click "Execute" next to a URL
+   - **Yellow**: Task is running
+   - **Green**: Task completed successfully
+3. **AI Assistant**: Enter instruction in the AI prompt box
+   - **Enter**: Submit task (shortcut)
+   - **Shift+Enter**: New line for multi-line input
+   - Click "🤖 Execute AI Task" button (alternative to Enter)
+4. **Remove**: Click "Remove" to delete a URL
 
 ### API Usage
 
@@ -194,6 +214,8 @@ Built with:
 - Flask (REST API)
 - Tkinter (GUI)
 - psutil (Process monitoring)
+- OpenCV (Screenshot analysis)
+- PyInstaller (Backend packaging - see [BUILD_GUIDE.md](BUILD_GUIDE.md))
 
 ---
 
