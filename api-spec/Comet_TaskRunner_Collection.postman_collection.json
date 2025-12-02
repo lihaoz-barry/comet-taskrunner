@@ -1,0 +1,784 @@
+{
+	"info": {
+		"_postman_id": "comet-taskrunner-api",
+		"name": "Comet Task Runner API",
+		"description": "Complete API collection for testing Comet Task Runner endpoints.\n\nThis collection includes:\n- Health check endpoints\n- URL task execution\n- AI prompt task execution (with e-commerce focused tests)\n- Task status monitoring\n- Queue management\n\nEnvironment Variables Required:\n- base_url: http://127.0.0.1:5000\n- task_id: (auto-populated by tests)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health & Status",
+			"item": [
+				{
+					"name": "Health Check",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has status ok\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql(\"ok\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"health"
+							]
+						},
+						"description": "Simple health check to verify the server is running."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Queue Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response contains queue info\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('queued');",
+									"    pm.expect(jsonData).to.have.property('completed');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/manager/status",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"manager",
+								"status"
+							]
+						},
+						"description": "Get complete task queue status including current, queued, and completed tasks."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Jobs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"jobs"
+							]
+						},
+						"description": "Get all tasks for debugging and monitoring."
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints for checking server health and monitoring queue status."
+		},
+		{
+			"name": "URL Tasks",
+			"item": [
+				{
+					"name": "Execute URL Task - Google",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Task ID is returned\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('task_id');",
+									"    pm.environment.set(\"task_id\", jsonData.task_id);",
+									"});",
+									"",
+									"pm.test(\"Task type is url\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.task_type).to.eql(\"url\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"url\": \"https://www.google.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/execute/url",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"execute",
+								"url"
+							]
+						},
+						"description": "Execute a URL navigation task to Google."
+					},
+					"response": []
+				},
+				{
+					"name": "Execute URL Task - 1688.com",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Task ID is returned\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('task_id');",
+									"    pm.environment.set(\"task_id\", jsonData.task_id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"url\": \"https://www.1688.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/execute/url",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"execute",
+								"url"
+							]
+						},
+						"description": "Navigate to 1688.com (Alibaba wholesale platform)."
+					},
+					"response": []
+				}
+			],
+			"description": "Test URL navigation tasks in the Comet browser."
+		},
+		{
+			"name": "AI Prompt Tasks - E-commerce",
+			"item": [
+				{
+					"name": "AI Task - /1mu3 Prompt",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Task ID is returned\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('task_id');",
+									"    pm.environment.set(\"task_id\", jsonData.task_id);",
+									"});",
+									"",
+									"pm.test(\"Task type is ai\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.task_type).to.eql(\"ai\");",
+									"});",
+									"",
+									"pm.test(\"Instruction is correct\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.instruction).to.include(\"/1mu3\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"instruction\": \"/1mu3\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/execute/ai",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"execute",
+								"ai"
+							]
+						},
+						"description": "Execute AI task with /1mu3 prompt for 1688.com product analysis."
+					},
+					"response": []
+				},
+				{
+					"name": "AI Task - /ikea Prompt",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Task ID is returned\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('task_id');",
+									"    pm.environment.set(\"task_id\", jsonData.task_id);",
+									"});",
+									"",
+									"pm.test(\"Instruction contains ikea\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.instruction).to.include(\"/ikea\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"instruction\": \"/ikea\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/execute/ai",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"execute",
+								"ai"
+							]
+						},
+						"description": "Execute AI task with /ikea prompt for IKEA product information."
+					},
+					"response": []
+				},
+				{
+					"name": "AI Task - /amazon Prompt",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Task created successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('task_id');",
+									"    pm.environment.set(\"task_id\", jsonData.task_id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"instruction\": \"/amazon\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/execute/ai",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"execute",
+								"ai"
+							]
+						},
+						"description": "Execute AI task with /amazon prompt for Amazon product search."
+					},
+					"response": []
+				}
+			],
+			"description": "AI prompt tasks specifically for e-commerce platforms (1688, IKEA, Amazon)."
+		},
+		{
+			"name": "AI Prompt Tasks - General",
+			"item": [
+				{
+					"name": "AI Task - Web Summarization",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Task ID is saved\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('task_id');",
+									"    pm.environment.set(\"task_id\", jsonData.task_id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"instruction\": \"Please summarize the main content of this webpage in 3-5 bullet points.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/execute/ai",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"execute",
+								"ai"
+							]
+						},
+						"description": "Ask AI to summarize webpage content - suitable for AI browser automation."
+					},
+					"response": []
+				},
+				{
+					"name": "AI Task - Data Extraction",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Task created\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('task_id');",
+									"    pm.environment.set(\"task_id\", jsonData.task_id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"instruction\": \"Extract all product prices from this page and list them in a table format.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/execute/ai",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"execute",
+								"ai"
+							]
+						},
+						"description": "Ask AI to extract specific data (prices) from the current webpage."
+					},
+					"response": []
+				},
+				{
+					"name": "AI Task - Image Analysis",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Task ID returned\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('task_id');",
+									"    pm.environment.set(\"task_id\", jsonData.task_id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"instruction\": \"Analyze the images on this page and describe what products are shown.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/execute/ai",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"execute",
+								"ai"
+							]
+						},
+						"description": "Ask AI to analyze images on the current page - tests multimodal capabilities."
+					},
+					"response": []
+				},
+				{
+					"name": "AI Task - Translation Request",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Task queued successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('task_id');",
+									"    pm.environment.set(\"task_id\", jsonData.task_id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"instruction\": \"Translate the main heading of this page to English.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/execute/ai",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"execute",
+								"ai"
+							]
+						},
+						"description": "Ask AI to translate content - useful for international e-commerce."
+					},
+					"response": []
+				},
+				{
+					"name": "AI Task - Comparative Analysis",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Task ID returned\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('task_id');",
+									"    pm.environment.set(\"task_id\", jsonData.task_id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"instruction\": \"Compare the features of the top 3 products on this page and create a comparison table.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/execute/ai",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"execute",
+								"ai"
+							]
+						},
+						"description": "Ask AI to perform comparative analysis - great for product research."
+					},
+					"response": []
+				}
+			],
+			"description": "General AI prompts suitable for browser automation and web analysis."
+		},
+		{
+			"name": "Task Status Monitoring",
+			"item": [
+				{
+					"name": "Get Task Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has status field\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('status');",
+									"    pm.expect(['running', 'done', 'failed']).to.include(jsonData.status);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/status/{{task_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"status",
+								"{{task_id}}"
+							]
+						},
+						"description": "Get the status of a specific task using its task_id. The task_id is automatically populated from previous requests."
+					},
+					"response": []
+				},
+				{
+					"name": "Poll Task Until Complete",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Auto-polling script - checks task status every 2 seconds",
+									"",
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"var status = jsonData.status;",
+									"",
+									"console.log(\"Current task status: \" + status);",
+									"",
+									"if (status === \"running\") {",
+									"    // If still running, wait 2 seconds and retry",
+									"    setTimeout(function() {",
+									"        postman.setNextRequest(\"Poll Task Until Complete\");",
+									"    }, 2000);",
+									"} else {",
+									"    // Task is done or failed, stop polling",
+									"    console.log(\"Task completed with status: \" + status);",
+									"    pm.test(\"Task is complete\", function () {",
+									"        pm.expect(['done', 'failed']).to.include(status);",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/status/{{task_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"status",
+								"{{task_id}}"
+							]
+						},
+						"description": "Automatically polls task status every 2 seconds until the task is complete or failed. Uses Postman test scripts for automation."
+					},
+					"response": []
+				}
+			],
+			"description": "Monitor task execution status and track progress."
+		},
+		{
+			"name": "Manual Callbacks",
+			"item": [
+				{
+					"name": "Mark Task as Done",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"task_id\": \"{{task_id}}\",\n    \"status\": \"done\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/callback",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"callback"
+							]
+						},
+						"description": "Manually mark a task as complete. Useful for testing or manual overrides."
+					},
+					"response": []
+				},
+				{
+					"name": "Mark Task as Failed",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"task_id\": \"{{task_id}}\",\n    \"status\": \"failed\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/callback",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"callback"
+							]
+						},
+						"description": "Manually mark a task as failed. Useful for error simulation."
+					},
+					"response": []
+				}
+			],
+			"description": "Manual callback endpoints for task status updates."
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://127.0.0.1:5000",
+			"type": "string"
+		},
+		{
+			"key": "task_id",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
