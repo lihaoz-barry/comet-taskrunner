@@ -19,12 +19,18 @@ Each layer is independent and can be replaced/reused.
 """
 
 import os
+import sys
 import subprocess
 import logging
 import winreg
 import threading
 import time
+from functools import wraps
 from flask import Flask, request, jsonify
+from dotenv import load_dotenv  # Load .env file
+
+# Load environment variables from .env file (if present)
+load_dotenv()
 
 # Import task components (independent, reusable)
 from tasks import BaseTask, TaskStatus, TaskType, URLTask, AITask
@@ -40,6 +46,33 @@ from task_queue import TaskQueue
 # ============================================================================
 
 app = Flask(__name__)
+
+# Authentication Decorator
+def require_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        # 1. Localhost Exemption: Allow local requests without key
+        if request.remote_addr in ['127.0.0.1', 'localhost', '::1']:
+            return f(*args, **kwargs)
+            
+        # 2. Get Server Key from Environment
+        server_key = os.environ.get('COMET_API_KEY')
+        
+        # Safety check: If exposed but no key set (should be caught at startup, but double check)
+        if not server_key:
+            logger.error("Security Error: Remote request received but COMET_API_KEY not set")
+            return jsonify({"error": "Server configuration error: No API Key set"}), 500
+
+        # 3. Verify Client Key
+        client_key = request.headers.get('X-API-Key')
+        
+        if client_key and client_key == server_key:
+            return f(*args, **kwargs)
+            
+        logger.warning(f"Unauthorized access attempt from {request.remote_addr}")
+        return jsonify({"error": "Unauthorized"}), 401
+        
+    return decorated
 
 # Configure detailed logging
 logging.basicConfig(
@@ -121,6 +154,7 @@ def health():
 # ============================================================================
 
 @app.route('/execute/url', methods=['POST'])
+@require_auth
 def execute_url():
     """
     Execute a URL navigation task in Comet browser.
@@ -193,6 +227,7 @@ def execute_url():
 # ============================================================================
 
 @app.route('/execute/ai', methods=['POST'])
+@require_auth
 def execute_ai():
     """
     Execute an AI Assistant interaction task with automation.
@@ -449,6 +484,25 @@ if __name__ == '__main__':
     logger.info("Starting Comet Task Runner Backend")
     logger.info("=" * 60)
     
+    # Security Check: Ensure API Key is set before exposing to 0.0.0.0
+    api_key = os.environ.get('COMET_API_KEY')
+    if not api_key:
+        print("\n" + "!" * 80)
+        print("CRITICAL SECURITY ERROR: COMET_API_KEY environment variable is not set!")
+        print("!" * 80)
+        print("\nTo securely expose the server to the network, you MUST set an API Key.")
+        print("\n[Option 1] Temporary (Current Session):")
+        print("  set COMET_API_KEY=my-secret-password-123")
+        print("\n[Option 2] Permanent (User Environment):")
+        print("  setx COMET_API_KEY \"my-secret-password-123\"")
+        print("\n[Option 3] .env file (Recommended for Dev):")
+        print("  Create a .env file with: COMET_API_KEY=my-secret-password-123")
+        print("\n" + "!" * 80 + "\n")
+        input("Press Enter to exit...")  # Keep window open to read error
+        sys.exit(1)
+        
+    logger.info(f"✓ Security: API Key detected (Length: {len(api_key)})")
+    
     # Initialize TaskQueue with comet_path
     # Note: task_queue is already declared at module level (line 57)
     comet_path = get_comet_path()
@@ -468,8 +522,9 @@ if __name__ == '__main__':
     start_task_monitor()
     
     try:
-        # Start Flask server
-        app.run(host='127.0.0.1', port=5000, debug=False)
+        # Start Flask server on 0.0.0.0 (All interfaces)
+        logger.info("Server listening on 0.0.0.0:5000 (Local + Remote)")
+        app.run(host='0.0.0.0', port=5000, debug=False)
     except KeyboardInterrupt:
         print("\n")
         logger.info("Backend shutting down...")

@@ -64,6 +64,29 @@ if %errorlevel% neq 0 (
 echo [OK] Dependencies checked
 echo.
 
+REM ===== Check API Key (Security) =====
+if not defined COMET_API_KEY (
+    if not exist ".env" (
+        echo [SECURITY WARNING] COMET_API_KEY not found!
+        echo.
+        echo The backend now requires an API Key to run securely.
+        echo.
+        set /p "TEMP_KEY=Please enter a temporary API Key for this session: "
+        if defined TEMP_KEY (
+            set "COMET_API_KEY=!TEMP_KEY!"
+            echo [OK] Temporary key set.
+        ) else (
+            echo [ERROR] No key provided. Backend will fail to start.
+        )
+        echo.
+    ) else (
+        echo [OK] Found .env file (assuming API Key is inside)
+    )
+) else (
+    echo [OK] COMET_API_KEY is set in environment
+)
+echo.
+
 REM ===== Detect Backend Version =====
 set "BACKEND_CMD=python src\backend.py"
 set "BACKEND_VERSION=Python Script"

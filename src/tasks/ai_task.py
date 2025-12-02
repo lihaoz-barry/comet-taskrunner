@@ -90,25 +90,50 @@ class AITask(BaseTask):
         super().__init__(TaskType.AI_ASSISTANT)
         self.instruction = instruction
         
-        # Template directory
+        # Template directory - support both dev mode and PyInstaller exe
         if template_dir:
             self.template_dir = Path(template_dir)
         else:
-            # Default: comet-taskrunner/templates
-            self.template_dir = Path(__file__).parent.parent.parent / "templates"
+            # Check if running as PyInstaller bundle
+            if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+                # Running as PyInstaller exe - use _MEIPASS
+                base_path = Path(sys._MEIPASS)
+                self.template_dir = base_path / "templates"
+                logger.info(f"Running as packaged exe, using _MEIPASS: {base_path}")
+            else:
+                # Running in development mode - use relative path
+                self.template_dir = Path(__file__).parent.parent.parent / "templates"
+        
+        # Screenshot directory - always use current working directory
+        # (not inside temp directory for PyInstaller)
+        if getattr(sys, 'frozen', False):
+            # For exe, use directory where exe is located
+            exe_dir = Path(sys.executable).parent
+            self.screenshot_dir = exe_dir / "screenshots"
+        else:
+            # For development, use project root
+            self.screenshot_dir = Path(__file__).parent.parent.parent / "screenshots"
+        
+        self.screenshot_dir.mkdir(exist_ok=True)
         
         # Automation state
         self.hwnd = None
         self.window_rect = None
         self.step_results = []
-        self.screenshot_dir = Path(__file__).parent.parent.parent / "screenshots"
-        self.screenshot_dir.mkdir(exist_ok=True)
         
         # Track automation completion (not just process)
         self.automation_completed = False
         
         logger.info(f"AITask created with instruction: {instruction[:50]}...")
         logger.info(f"Template directory: {self.template_dir}")
+        logger.info(f"Screenshot directory: {self.screenshot_dir}")
+        
+        # Verify template directory exists
+        if not self.template_dir.exists():
+            logger.error(f"Template directory not found: {self.template_dir}")
+            logger.error("Please ensure templates folder is in the correct location")
+        else:
+            logger.info(f"✓ Template directory verified: {self.template_dir}")
     
     def execute(self, comet_path: str) -> int:
         """
