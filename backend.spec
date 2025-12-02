@@ -19,8 +19,9 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        # Include templates directory if it exists
-        # ('templates', 'templates'),
+        # Include templates directory for AI automation
+        ('templates', 'templates'),
+        # Include screenshots directory (create if doesn't exist)
     ],
     hiddenimports=[
         # Explicitly include modules that PyInstaller might miss
@@ -30,6 +31,7 @@ a = Analysis(
         'winreg',
         'flask',
         'flask.json',
+        'dotenv',  # python-dotenv
         'psutil',
         'cv2',  # opencv-python
         'numpy',

@@ -38,7 +38,35 @@ Double-click **`start.bat`** file.
 - Checks and installs dependencies
 - **Best for**: Development, debugging, troubleshooting
 
-### Option 2: Background Mode (Recommended for Daily Use)
+## 🔒 Security Configuration (Important)
+
+The backend now listens on `0.0.0.0` (all network interfaces) to allow Azure deployment. To secure this, you **MUST** set an API Key.
+
+### Setting the API Key
+You must set the `COMET_API_KEY` environment variable before running the backend.
+
+**Option 1: Temporary (Current Session)**
+```bash
+set COMET_API_KEY=my-secret-password-123
+```
+
+**Option 2: Permanent (User Environment)**
+```bash
+setx COMET_API_KEY "my-secret-password-123"
+# Note: Restart terminal after setx
+```
+
+**Option 3: .env file (Recommended)**
+Create a `.env` file in the project root:
+```ini
+COMET_API_KEY=my-secret-password-123
+```
+
+### Authentication Logic
+- **Localhost (127.0.0.1)**: No key required (Convenient for local dev)
+- **Remote (Azure/Network)**: Must include header `X-API-Key: <your-key>`
+
+## 🚀 How to Run (Background Mode)
 Double-click **`start_background.bat`** file.
 - **Frontend**: Hidden (no console, runs with pythonw)
 - **Backend**: Separate terminal window (logs visible)

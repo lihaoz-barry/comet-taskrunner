@@ -44,6 +44,9 @@ class WindowManager:
         """
         if keywords is None:
             keywords = ["Comet", "Perplexity"]
+            
+        # Keywords to explicitly exclude (to avoid matching the backend console itself)
+        exclude_keywords = ["backend.exe", "python.exe", "cmd.exe", "powershell.exe", "comet-taskrunner", ".py"]
         
         logger.info(f"Searching for window with keywords: {keywords}")
         
@@ -55,6 +58,10 @@ class WindowManager:
             
             try:
                 title = win32gui.GetWindowText(hwnd).lower()
+                
+                # Check exclusion list first
+                if any(ex in title for ex in exclude_keywords):
+                    return True
                 
                 # Check if ANY keyword matches
                 if any(keyword.lower() in title for keyword in keywords):
