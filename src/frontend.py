@@ -487,13 +487,17 @@ class CometRunnerApp:
         # Determine status and colors
         if is_current:
             # Running task - Yellow/Orange background
-            if task_type == "ai":
-                automation_progress = task.get('automation_progress', {})
-                current_step = automation_progress.get('current_step', 0)
-                total_steps = automation_progress.get('total_steps', 7)
-                status_text = f"Step {current_step}/{total_steps}"
+            # Get standardized progress
+            progress = task.get('progress', {})
+            
+            if progress.get('has_steps', False):
+                # Task with steps (e.g., AI task)
+                current = progress.get('current_step', 0)
+                total = progress.get('total_steps', 0)
+                status_text = f"Step {current}/{total}"
             else:
-                status_text = "Running"
+                # Task without steps (e.g., URL task)
+                status_text = progress.get('status_text', 'Running')
             
             arrow = "→ "
             bg_color = "#FFD700"  # Gold/Yellow

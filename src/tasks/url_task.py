@@ -60,7 +60,7 @@ Example Usage (In other project):
 import subprocess
 import logging
 from typing import Dict, Any
-from .base_task import BaseTask, TaskType
+from .base_task import BaseTask, TaskType, TaskStatus
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +161,31 @@ class URLTask(BaseTask):
         # - DOM ready state check
         
         return False
+    
+    def get_progress(self) -> Dict[str, Any]:
+        """
+        Get progress information for URL task.
+        
+        URL tasks don't have discrete steps - they're either running or done.
+        """
+        # Simple binary progress: 0% or 100%
+        progress_percent = 100 if self.status == TaskStatus.DONE else 0
+        
+        return {
+            'has_steps': False,
+            'current_step': 0,
+            'total_steps': 0,
+            'progress_percent': progress_percent,
+            'status_text': f'Opening {self.url}',
+            'details': {
+                'url': self.url,
+                'task_type': 'url'
+            }
+        }
+    
+    # ========================================================================
+    # SERIALIZATION
+    # ========================================================================
     
     def to_dict(self) -> Dict[str, Any]:
         """

@@ -88,15 +88,22 @@ if not defined COMET_API_KEY (
 echo.
 
 REM ===== Detect Backend Version =====
+REM Priority: Python script (for development) → Packaged exe (for production)
 set "BACKEND_CMD=python src\backend.py"
-set "BACKEND_VERSION=Python Script"
+set "BACKEND_VERSION=Python Script (Development)"
 
-if exist "dist\backend.exe" (
-    set "BACKEND_CMD=dist\backend.exe"
-    set "BACKEND_VERSION=Packaged .exe"
-    echo [INFO] Found packaged backend.exe - using standalone version
+REM Check if user explicitly wants to use packaged exe
+if defined USE_PACKAGED_EXE (
+    if exist "dist\backend.exe" (
+        set "BACKEND_CMD=dist\backend.exe"
+        set "BACKEND_VERSION=Packaged .exe"
+        echo [INFO] Using packaged backend.exe (USE_PACKAGED_EXE is set)
+    ) else (
+        echo [WARNING] USE_PACKAGED_EXE is set but dist\backend.exe not found
+        echo [INFO] Falling back to Python script
+    )
 ) else (
-    echo [INFO "No backend.exe found - using Python script
+    echo [INFO] Using Python script for development (set USE_PACKAGED_EXE=1 to use exe)
 )
 echo.
 
