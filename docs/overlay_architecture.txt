@@ -1,0 +1,232 @@
+# Overlay System Architecture
+
+## Component Hierarchy
+
+┌──────────────────────────────────────────────────────────────┐
+│                        AITask                                 │
+│  (Automation Task with Overlay Integration)                  │
+│                                                               │
+│  ┌────────────────────────────────────────────────────┐     │
+│  │  _automation_sequence()                            │     │
+│  │  ├─ show overlay                                   │     │
+│  │  ├─ Step 1: Wait for initialization ─┬─> update   │     │
+│  │  ├─ Step 2: Activate window         ├─> update   │     │
+│  │  ├─ Step 3: Find Assistant          ├─> update   │     │
+│  │  ├─ Step 4: Click Assistant         ├─> update   │     │
+│  │  ├─ Step 5: Find input box          ├─> update   │     │
+│  │  ├─ Step 6: Input text              ├─> update   │     │
+│  │  └─ Step 7: Send instruction        └─> update   │     │
+│  └────────────────────────────────────────────────────┘     │
+└─────────────────────┬────────────────────────────────────────┘
+                      │
+                      │ creates & controls
+                      ▼
+┌──────────────────────────────────────────────────────────────┐
+│                   StatusOverlay                               │
+│  (Main Overlay Window - Tkinter)                             │
+│                                                               │
+│  ┌─────────────────┐  ┌──────────────────┐  ┌─────────────┐│
+│  │ OverlayConfig   │  │ KeyboardHandler  │  │ SystemTray  ││
+│  │                 │  │                  │  │             ││
+│  │ • Position      │  │ • ESC listener   │  │ • Icon      ││
+│  │ • Opacity       │  │ • Cancel callback│  │ • Menu      ││
+│  │ • Dimensions    │  │                  │  │ • Controls  ││
+│  └─────────────────┘  └──────────────────┘  └─────────────┘│
+│                                                               │
+│  UI Components:                                              │
+│  ┌────────────────────────────────┐                         │
+│  │ 🤖 Title: COMET AUTOMATION     │                         │
+│  │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │                         │
+│  │ ⚡ Warning                      │                         │
+│  │ 📍 Step N/7                    │                         │
+│  │ Current: ...                   │                         │
+│  │ Next: ...                      │                         │
+│  │ ⏱️ Time: Xs                     │                         │
+│  │ [Progress Bar] XX%             │                         │
+│  │ ESC to cancel                  │                         │
+│  └────────────────────────────────┘                         │
+└──────────────────────────────────────────────────────────────┘
+
+## Data Flow
+
+┌─────────────┐
+│   AITask    │
+└──────┬──────┘
+       │
+       │ 1. show()
+       ├──────────────────────────────┐
+       │                              │
+       │ 2. update_status()           ▼
+       │    (step, desc, progress) ┌──────────────────┐
+       ├──────────────────────────>│  StatusOverlay   │
+       │                            │                  │
+       │                            │ [Tkinter Thread] │
+       │                            │  • Update UI     │
+       │                            │  • Update time   │
+       │                            │  • Listen ESC    │
+       │                            └──────────────────┘
+       │                                     │
+       │ 3. close()                         │ ESC pressed
+       ├────────────────────────────────────┤
+       │                                     │
+       │ 4. _cancel_task() <─────────────────┘
+       │    (via callback)
+       │
+       └─> Task cancelled
+
+## Thread Model
+
+Main Thread                      Overlay Thread
+───────────                      ──────────────
+    │                                 │
+    ├─ Create AITask                 │
+    │                                 │
+    ├─ Initialize overlay             │
+    │                                 │
+    ├─ Start automation               │
+    │                                 │
+    ├─ overlay.show() ───────────────>│
+    │                                 ├─ Create Tk window
+    │                                 ├─ Start mainloop
+    │                                 ├─ Update loop (100ms)
+    │                                 │
+    ├─ Step 1 execution               │
+    ├─ update_status() ──────────────>│
+    │  (thread-safe)                  ├─ Queue update
+    │                                 ├─ Apply changes
+    │                                 │
+    ├─ Step 2 execution               │
+    ├─ update_status() ──────────────>│
+    │                                 ├─ Update display
+    │                                 │
+    ├─ ... continue steps             │
+    │                                 │
+    ├─ All steps complete             │
+    │                                 │
+    ├─ overlay.close() ──────────────>│
+    │                                 ├─ Stop mainloop
+    │                                 └─ Cleanup
+    │                                 
+    └─ Task complete
+
+## Configuration Flow
+
+User Input
+    │
+    ├─ System Tray Menu
+    │      │
+    │      └─> Change Position
+    │              │
+    ▼              ▼
+OverlayConfig.set_position()
+    │
+    ├─> Update memory config
+    │
+    └─> Save to JSON file
+            │
+            └─> config/overlay_config.json
+                    │
+                    └─> Loaded on next run
+
+## Error Handling Strategy
+
+┌────────────────────────────────────┐
+│  Try to use feature                │
+└──────────┬─────────────────────────┘
+           │
+           ├─> Success ─> Use feature
+           │
+           └─> Failure (ImportError, etc.)
+                   │
+                   ├─> Log warning
+                   │
+                   ├─> Set flag (e.g., PYSTRAY_AVAILABLE=False)
+                   │
+                   └─> Continue without feature
+                           │
+                           └─> Graceful degradation
+
+Examples:
+• pystray unavailable → No system tray (overlay still works)
+• keyboard unavailable → No ESC cancel (overlay still works)
+• Tkinter unavailable → Overlay disabled (automation still works)
+
+## File Dependencies
+
+src/tasks/ai_task.py
+    │
+    └─> imports src/overlay
+            │
+            ├─> overlay_config.py
+            │       └─> (no dependencies)
+            │
+            ├─> status_overlay.py
+            │       ├─> tkinter (built-in)
+            │       ├─> overlay_config.py
+            │       └─> keyboard_handler.py
+            │
+            ├─> keyboard_handler.py
+            │       └─> keyboard (optional)
+            │
+            └─> system_tray.py
+                    ├─> pystray (optional)
+                    ├─> PIL/Pillow
+                    └─> overlay_config.py
+
+## Initialization Sequence
+
+1. AITask.__init__()
+   └─> StatusOverlay() created
+       └─> OverlayConfig() loaded
+           └─> Read config/overlay_config.json (or use defaults)
+
+2. AITask.execute()
+   └─> Start automation thread
+       └─> _automation_sequence()
+           └─> overlay.show()
+               ├─> Create Tkinter window
+               ├─> Start keyboard listener
+               └─> Start update loop
+
+3. During automation
+   └─> _update_overlay_step(N)
+       └─> overlay.update_status(...)
+           └─> Thread-safe state update
+
+4. Completion
+   └─> overlay.close()
+       ├─> Stop keyboard listener
+       ├─> Close Tkinter window
+       └─> Cleanup resources
+
+## Memory & Performance
+
+Memory Usage:
+├─ Tkinter window: ~5-10 MB
+├─ Status data: < 1 MB
+├─ Configuration: < 1 KB
+└─ Total: ~10-20 MB
+
+CPU Usage:
+├─ Update loop (100ms): < 1%
+├─ Tkinter rendering: < 1%
+└─ Total: Negligible (< 1%)
+
+Update Frequency:
+├─ Status updates: On-demand (per step)
+├─ Time display: Every 100ms
+└─ Progress bar: Every 100ms
+
+## Security Considerations
+
+✅ No network communication
+✅ No sensitive data storage
+✅ No elevated privileges required (core features)
+✅ Graceful handling of permission errors
+✅ No arbitrary code execution
+✅ Configuration validated on load
+✅ Exception handling prevents crashes
+
+⚠️ Optional features may require:
+   • keyboard module: May need admin on some systems
+   • pystray: Requires GTK on Linux
