@@ -30,6 +30,14 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from automation import WindowManager, ScreenshotCapture, PatternMatcher, MouseController
 
+# Import overlay modules
+try:
+    from overlay import StatusOverlay, OverlayConfig
+    OVERLAY_AVAILABLE = True
+except ImportError:
+    OVERLAY_AVAILABLE = False
+    logging.warning("Overlay module not available")
+
 logger = logging.getLogger(__name__)
 
 
@@ -79,6 +87,17 @@ class AITask(BaseTask):
         'input_box': 0.5,  # More strict
     }
     
+    # Step descriptions for overlay
+    STEP_DESCRIPTIONS = {
+        1: ("等待浏览器初始化", "激活窗口"),
+        2: ("激活Comet窗口", "查找Assistant按钮"),
+        3: ("查找Assistant按钮", "点击Assistant按钮"),
+        4: ("点击Assistant按钮", "查找输入框"),
+        5: ("查找输入框", "输入指令文字"),
+        6: ("输入指令文字", "发送指令"),
+        7: ("发送指令", "完成"),
+    }
+    
     def __init__(self, instruction: str, template_dir: str = None):
         """
         Create AI automation task.
@@ -124,6 +143,17 @@ class AITask(BaseTask):
         # Track automation completion (not just process)
         self.automation_completed = False
         
+        # Overlay system
+        self.overlay = None
+        if OVERLAY_AVAILABLE:
+            try:
+                self.overlay = StatusOverlay()
+                self.overlay.set_cancel_callback(self._cancel_task)
+                logger.info("✓ Overlay system initialized")
+            except Exception as e:
+                logger.warning(f"Failed to initialize overlay: {e}")
+                self.overlay = None
+        
         logger.info(f"AITask created with instruction: {instruction[:50]}...")
         logger.info(f"Template directory: {self.template_dir}")
         logger.info(f"Screenshot directory: {self.screenshot_dir}")
@@ -134,6 +164,14 @@ class AITask(BaseTask):
             logger.error("Please ensure templates folder is in the correct location")
         else:
             logger.info(f"✓ Template directory verified: {self.template_dir}")
+    
+    def _cancel_task(self):
+        """Cancel current automation task (ESC pressed)"""
+        logger.warning("Task cancellation requested by user (ESC pressed)")
+        self.automation_completed = True
+        self.fail("User cancelled task")
+        if self.overlay:
+            self.overlay.close()
     
     def execute(self, comet_path: str) -> int:
         """
@@ -182,17 +220,28 @@ class AITask(BaseTask):
         logger.info(f"Instruction: {self.instruction}")
         logger.info("="*60)
         
+        # Show overlay at start
+        if self.overlay:
+            try:
+                self.overlay.show()
+                self._update_overlay_step(0)
+            except Exception as e:
+                logger.warning(f"Failed to show overlay: {e}")
+        
         try:
             # Step 1: Wait for browser initialization
+            self._update_overlay_step(1)
             self._step_1_wait_for_initialization()
             
             # Step 2: Activate window
+            self._update_overlay_step(2)
             result = self._step_2_activate_window()
             if not result.success:
                 self.fail(f"Step 2 failed: {result.error}")
                 return
             
             # Step 3: Find Assistant button
+            self._update_overlay_step(3)
             result = self._step_3_find_assistant()
             if not result.success:
                 self.fail(f"Step 3 failed: {result.error}")
@@ -200,12 +249,14 @@ class AITask(BaseTask):
             assistant_coords = result.data['coordinates']
             
             # Step 4: Click Assistant button
+            self._update_overlay_step(4)
             result = self._step_4_click_assistant(assistant_coords)
             if not result.success:
                 self.fail(f"Step 4 failed: {result.error}")
                 return
             
             # Step 5: Find input box
+            self._update_overlay_step(5)
             result = self._step_5_find_input_box()
             if not result.success:
                 self.fail(f"Step 5 failed: {result.error}")
@@ -213,12 +264,14 @@ class AITask(BaseTask):
             input_coords = result.data['coordinates']
             
             # Step 6: Input text
+            self._update_overlay_step(6)
             result = self._step_6_input_text(input_coords)
             if not result.success:
                 self.fail(f"Step 6 failed: {result.error}")
                 return
             
             # Step 7: Send instruction
+            self._update_overlay_step(7)
             result = self._step_7_send()
             if not result.success:
                 self.fail(f"Step 7 failed: {result.error}")
@@ -239,6 +292,47 @@ class AITask(BaseTask):
             self.fail(error_msg)
             # Mark automation as completed (even if failed)
             self.automation_completed = True
+        
+        finally:
+            # Hide overlay when done
+            if self.overlay:
+                try:
+                    time.sleep(1)  # Brief pause to show completion
+                    self.overlay.close()
+                except Exception as e:
+                    logger.warning(f"Failed to close overlay: {e}")
+    
+    # ========================================================================
+    # OVERLAY INTEGRATION
+    # ========================================================================
+    
+    def _update_overlay_step(self, step_number: int):
+        """
+        Update overlay with current step information.
+        
+        Args:
+            step_number: Current step number (0-7)
+        """
+        if not self.overlay:
+            return
+        
+        try:
+            # Get step descriptions
+            if step_number in self.STEP_DESCRIPTIONS:
+                current_desc, next_desc = self.STEP_DESCRIPTIONS[step_number]
+            else:
+                current_desc = "准备开始..."
+                next_desc = "等待浏览器初始化"
+            
+            # Update overlay
+            self.overlay.update_status(
+                current_step=step_number,
+                total_steps=7,
+                step_description=current_desc,
+                next_step_description=next_desc
+            )
+        except Exception as e:
+            logger.warning(f"Failed to update overlay: {e}")
     
     # ========================================================================
     # AUTOMATION STEPS
