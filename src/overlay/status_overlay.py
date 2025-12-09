@@ -19,6 +19,9 @@ logger = logging.getLogger(__name__)
 class StatusOverlay:
     """Desktop status overlay using Tkinter"""
     
+    # Default automation steps count
+    DEFAULT_TOTAL_STEPS = 7
+    
     def __init__(self, config: OverlayConfig = None):
         """
         Initialize status overlay.
@@ -35,7 +38,7 @@ class StatusOverlay:
         
         # Status data
         self.current_step = 0
-        self.total_steps = 7
+        self.total_steps = self.DEFAULT_TOTAL_STEPS
         self.step_description = "等待开始..."
         self.next_step_description = ""
         self.elapsed_time = 0
@@ -300,8 +303,8 @@ class StatusOverlay:
             try:
                 self.root.quit()
                 self.root.destroy()
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"Error closing overlay window: {e}")
             self.root = None
         logger.info("Overlay closed")
     

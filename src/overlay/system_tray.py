@@ -80,8 +80,8 @@ class SystemTray:
         if self.icon:
             try:
                 self.icon.stop()
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"Error stopping system tray: {e}")
         logger.info("System tray stopped")
     
     def _run_tray(self):
