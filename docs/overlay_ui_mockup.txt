@@ -1,0 +1,108 @@
+# Desktop Overlay UI Mockup
+
+## Overlay Window (300x280 pixels, semi-transparent)
+
+┌──────────────────────────────────┐
+│  🤖 COMET AUTOMATION             │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
+│                                  │
+│  ⚡ 屏幕正在被自动控制             │
+│                                  │
+│  📍 Step 5/7                     │
+│  正在: 查找输入框                 │
+│  下一步: 输入指令文字             │
+│                                  │
+│  ⏱️ 已运行: 12秒                  │
+│  [■■■■■■■□□□] 71%               │
+│                                  │
+│  按 ESC 取消                     │
+└──────────────────────────────────┘
+
+## Color Scheme
+
+- Background: #1a1a1a (dark, 85% opacity)
+- Title: #00ff88 (bright green)
+- Warning: #ffaa00 (orange)
+- Primary Text: #ffffff (white)
+- Secondary Text: #aaaaaa (light gray)
+- Progress Bar: #00ff88 (green)
+- Progress Track: #333333 (dark gray)
+
+## Position Options
+
+TOP_RIGHT (default):
+┌─────────────────────────────────┐
+│                          [OVER] │
+│                          [LAY] │
+
+TOP_LEFT:
+┌─────────────────────────────────┐
+│ [OVER]                          │
+│ [LAY]                           │
+
+BOTTOM_RIGHT:
+│                          [OVER] │
+│                          [LAY]  │
+└─────────────────────────────────┘
+
+BOTTOM_LEFT:
+│ [OVER]                          │
+│ [LAY]                           │
+└─────────────────────────────────┘
+
+## System Tray Menu
+
+Right-click on tray icon:
+
+┌─────────────────────────────┐
+│ ✓ 显示 Overlay              │
+├─────────────────────────────┤
+│ 位置设置                  ▶ │
+│   ├─ ○ 左上角               │
+│   ├─ ● 右上角 (当前)        │
+│   ├─ ○ 左下角               │
+│   └─ ○ 右下角               │
+├─────────────────────────────┤
+│ 当前状态: 正在运行          │
+├─────────────────────────────┤
+│ 退出                        │
+└─────────────────────────────┘
+
+## Behavior
+
+1. **Always On Top**: Window stays above all other applications
+2. **Semi-Transparent**: 85% opacity allows seeing through
+3. **No Taskbar Icon**: Doesn't clutter taskbar
+4. **Auto-Position**: Maintains position even if screen resolution changes
+5. **Real-Time Updates**: Progress and time update every 100ms
+6. **Smooth Animation**: Progress bar animates smoothly
+7. **ESC Cancel**: Press ESC anytime to cancel (if keyboard module available)
+
+## State Transitions
+
+[Hidden] ─ show() ─> [Visible]
+[Visible] ─ hide() ─> [Hidden]
+[Visible] ─ close() ─> [Closed]
+[Visible] ─ ESC ─> [Cancelled] ─> [Closed]
+
+## Thread Model
+
+Main Thread                 Overlay Thread
+    │                            │
+    ├─ create AITask            │
+    │                            │
+    ├─ show() ─────────────────>│
+    │                            ├─ create Tkinter window
+    │                            ├─ start mainloop
+    │                            ├─ update every 100ms
+    ├─ update_status() ────────>│
+    │                            ├─ apply updates (thread-safe)
+    │                            │
+    ├─ automation steps         │
+    │                            ├─ display progress
+    │                            │
+    ├─ close() ────────────────>│
+    │                            ├─ stop mainloop
+    │                            └─ cleanup
+    │                            
+    └─ continue
