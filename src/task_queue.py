@@ -162,7 +162,7 @@ class TaskQueue:
                         progress_info = ""
                         if hasattr(self.current_task, 'get_automation_progress'):
                             prog = self.current_task.get_automation_progress()
-                            progress_info = f" - Step {prog.get('current_step', 0)}/{prog.get('total_steps', 7)}"
+                            progress_info = f" - Step {prog.get('current_step', 0)}/{prog.get('total_steps', 0)}"
                         
                         logger.info(f"→ CURRENT: [{task_type.upper()}] {task_id} - {status}{progress_info}")
                     else:
@@ -239,9 +239,8 @@ class TaskQueue:
         """
         data = task.to_dict()
         
-        # Add automation progress for AI tasks
-        if task.task_type == TaskType.AI_ASSISTANT:
-            data['automation_progress'] = task.get_automation_progress()
+        # Add standardized progress (works for ALL task types)
+        data['progress'] = task.get_progress()
         
         return data
     
