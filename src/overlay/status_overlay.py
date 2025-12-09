@@ -11,6 +11,7 @@ import time
 import logging
 from typing import Optional, Dict, Any
 from .overlay_config import OverlayConfig, OverlayPosition
+from .keyboard_handler import KeyboardHandler
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,9 @@ class StatusOverlay:
         
         # Task cancellation callback
         self.cancel_callback = None
+        
+        # Keyboard handler for ESC key
+        self.keyboard_handler = KeyboardHandler()
     
     def _create_window(self):
         """Create the Tkinter overlay window"""
@@ -264,6 +268,11 @@ class StatusOverlay:
             self.running = True
             self.visible = True
             threading.Thread(target=self._run_overlay, daemon=True).start()
+            
+            # Start keyboard listener
+            if self.cancel_callback:
+                self.keyboard_handler.start_listening(self.cancel_callback)
+            
             logger.info("Overlay shown")
         elif not self.visible:
             # Just make visible again
@@ -283,6 +292,10 @@ class StatusOverlay:
         """Close the overlay window"""
         self.running = False
         self.visible = False
+        
+        # Stop keyboard listener
+        self.keyboard_handler.stop_listening()
+        
         if self.root:
             try:
                 self.root.quit()

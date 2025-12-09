@@ -12,9 +12,10 @@ from PIL import Image, ImageDraw
 try:
     import pystray
     PYSTRAY_AVAILABLE = True
-except ImportError:
+except (ImportError, ValueError, Exception) as e:
     PYSTRAY_AVAILABLE = False
-    logging.warning("pystray not available - system tray will be disabled")
+    pystray = None
+    logging.warning(f"pystray not available - system tray will be disabled: {e}")
 
 from .overlay_config import OverlayPosition
 
