@@ -627,9 +627,15 @@ if __name__ == '__main__':
     start_task_monitor()
     
     try:
-        # Start Flask server on 0.0.0.0 (All interfaces)
-        logger.info("Server listening on 0.0.0.0:5000 (Local + Remote)")
-        app.run(host='0.0.0.0', port=5000, debug=False)
+        # Get port from environment variable or use default
+        # Port 5000 and 5500 are in Windows reserved ranges
+        # Using 8888 which is outside reserved ranges
+        port = int(os.environ.get('BACKEND_PORT', 8888))
+        host = os.environ.get('BACKEND_HOST', '0.0.0.0')
+
+        # Start Flask server
+        logger.info(f"Server listening on {host}:{port} (Local + Remote)")
+        app.run(host=host, port=port, debug=False)
     except KeyboardInterrupt:
         print("\n")
         logger.info("Backend shutting down...")

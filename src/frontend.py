@@ -9,7 +9,10 @@ import os
 import shutil
 import json
 
-BACKEND_URL = "http://127.0.0.1:5000"
+# Backend URL - configurable via environment variable
+# Default port is 8888 to avoid Windows reserved port ranges
+BACKEND_PORT = os.environ.get('BACKEND_PORT', '8888')
+BACKEND_URL = f"http://127.0.0.1:{BACKEND_PORT}"
 URLS_FILE = "urls.json"
 
 class CometRunnerApp:
