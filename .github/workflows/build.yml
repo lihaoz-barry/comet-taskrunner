@@ -4,12 +4,14 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:  # Allow manual triggering
+  release:
+    types: [ published ]  # Trigger on release publication
 
 jobs:
   build:
     runs-on: windows-latest
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
 
     steps:
@@ -46,6 +48,8 @@ jobs:
         run: |
           if ("${{ github.event_name }}" -eq "pull_request") {
             $artifactName = "backend-exe-pr-${{ github.event.pull_request.number }}"
+          } elseif ("${{ github.event_name }}" -eq "release") {
+            $artifactName = "backend-exe-${{ github.event.release.tag_name }}"
           } else {
             $artifactName = "backend-exe-manual-${{ github.run_id }}"
           }
@@ -58,6 +62,13 @@ jobs:
           name: ${{ steps.artifact-name.outputs.name }}
           path: dist/backend.exe
           retention-days: 30
+
+      - name: Upload backend.exe to Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/backend.exe
+          tag_name: ${{ github.event.release.tag_name }}
 
       - name: Post PR comment with download links
         if: github.event_name == 'pull_request'
