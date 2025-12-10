@@ -19,7 +19,7 @@ This follows the Single Responsibility Principle.
 
 import logging
 import time
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Any
 from tasks import BaseTask, URLTask, AITask, TaskStatus, TaskType
 
 logger = logging.getLogger(__name__)
@@ -75,6 +75,28 @@ class TaskManager:
             AITask: The created task
         """
         task = AITask(instruction, coordinates)
+        self.tasks[task.task_id] = task
+        return task
+
+    def create_configurable_task(
+        self,
+        workflow_config,
+        inputs: Dict[str, Any]
+    ) -> BaseTask:
+        """
+        Create and store a configurable workflow task.
+        
+        Args:
+            workflow_config: WorkflowConfig object
+            inputs: Input dictionary
+            
+        Returns:
+            ConfigurableTask: The created task
+        """
+        # Import internally to avoid circular dependency if any
+        from tasks import ConfigurableTask
+        
+        task = ConfigurableTask(workflow_config, inputs)
         self.tasks[task.task_id] = task
         return task
     
