@@ -1,4 +1,5 @@
 flask
+python-dotenv
 requests
 psutil
 opencv-python>=4.8.0

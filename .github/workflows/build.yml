@@ -73,14 +73,14 @@ jobs:
             const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
 
             // Construct download URLs
-            const actionsUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+            const repoUrl = context.payload.repository.html_url;
+            const actionsUrl = `${repoUrl}/actions/runs/${runId}`;
             const nightlyLinkUrl = `https://nightly.link/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}/${artifactName}.zip`;
 
             const commentBody = [
               '## 🎉 Backend Build Successful!',
               '',
               '**Build Information:**',
-              `- ✅ Status: Build completed successfully`,
               `- 📦 Artifact: \`${artifactName}\``,
               `- 💾 Size: ${fileSizeMB} MB`,
               `- 🔖 Commit: \`${shortSha}\``,
