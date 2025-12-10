@@ -289,6 +289,44 @@ class BaseTask(ABC):
         """
         pass
     
+    @abstractmethod
+    def get_progress(self) -> Dict[str, Any]:
+        """
+        Get standardized progress information for this task.
+        
+        All task types must implement this to provide consistent progress data.
+        
+        Returns:
+            Dict with standardized progress fields:
+            - has_steps (bool): Whether this task has discrete steps
+            - current_step (int): Current step number (0 if no steps)
+            - total_steps (int): Total number of steps (0 if no steps)
+            - progress_percent (int): Overall progress 0-100
+            - status_text (str): Human-readable status
+            - details (dict): Task-specific additional information
+        
+        Example for task without steps (URLTask):
+            {
+                'has_steps': False,
+                'current_step': 0,
+                'total_steps': 0,
+                'progress_percent': 50,
+                'status_text': 'Opening URL...',
+                'details': {'url': 'https://...'}
+            }
+        
+        Example for task with steps (AITask):
+            {
+                'has_steps': True,
+                'current_step': 3,
+                'total_steps': 9,
+                'progress_percent': 33,
+                'status_text': 'Finding Assistant button...',
+                'details': {'step_name': 'find_assistant'}
+            }
+        """
+        pass
+    
     # ------------------------------------------------------------------------
     # Serialization
     # ------------------------------------------------------------------------

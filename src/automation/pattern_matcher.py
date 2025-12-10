@@ -29,7 +29,8 @@ class PatternMatcher:
         screenshot_path: str,
         template_path: str,
         window_rect: Tuple[int, int, int, int],
-        threshold: float = 0.3
+        threshold: float = 0.3,
+        save_debug: bool = False
     ) -> Optional[Tuple[int, int]]:
         """
         Find template pattern in screenshot.
@@ -39,6 +40,7 @@ class PatternMatcher:
             template_path: Path to template image
             window_rect: Window coordinates (left, top, right, bottom)
             threshold: Matching confidence threshold (0.0-1.0)
+            save_debug: If True, save a debug image with the match highlighted
             
         Returns:
             (x, y) screen coordinates of pattern center, or None
@@ -82,6 +84,35 @@ class PatternMatcher:
             logger.info(f"Pattern found! Confidence={max_val:.4f}, "
                        f"Position in screenshot=({match_x}, {match_y}), "
                        f"Screen coordinates=({center_x}, {center_y})")
+            
+            # Save debug image if requested
+            if save_debug:
+                try:
+                    debug_img = screenshot.copy()
+                    # Draw Red Rectangle (BGR)
+                    cv2.rectangle(
+                        debug_img, 
+                        (match_x, match_y), 
+                        (match_x + template_w, match_y + template_h), 
+                        (0, 0, 255), 
+                        2
+                    )
+                    # Add text
+                    cv2.putText(
+                        debug_img, 
+                        f"Conf: {max_val:.2f}", 
+                        (match_x, match_y - 10), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 
+                        0.5, 
+                        (0, 0, 255), 
+                        1
+                    )
+                    
+                    debug_path = Path(screenshot_path).parent / f"debug_match_{Path(template_path).stem}.png"
+                    cv2.imwrite(str(debug_path), debug_img)
+                    logger.info(f"Saved visual debug image: {debug_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to save debug image: {e}")
             
             return (center_x, center_y)
             

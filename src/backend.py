@@ -33,7 +33,9 @@ from dotenv import load_dotenv  # Load .env file
 load_dotenv()
 
 # Import task components (independent, reusable)
-from tasks import BaseTask, TaskStatus, TaskType, URLTask, AITask
+from tasks import BaseTask, TaskStatus, TaskType, URLTask, AITask, ConfigurableTask
+from workflow import WorkflowRegistry, WorkflowConfig
+from pathlib import Path
 
 # Import task manager (storage layer)
 from task_manager import TaskManager
@@ -84,6 +86,12 @@ logger = logging.getLogger(__name__)
 # Initialize the global Task Manager
 # This manages ALL tasks (both URL and AI) in memory
 task_manager = TaskManager()
+
+# Initialize Workflow Registry (load YAML workflows)
+# Looks for workflows directory at project root (parent of src)
+workflow_registry = WorkflowRegistry(
+    workflows_dir=str(Path(__file__).parent.parent / "workflows")
+)
 
 # Initialize the global Task Queue
 # This coordinates sequential task execution (one at a time)
@@ -305,6 +313,74 @@ def execute_ai():
     except Exception as e:
         logger.error(f"Failed to submit AI task: {e}")
         task.fail(str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+
+# ============================================================================
+# API ENDPOINTS - GENERIC WORKFLOW EXECUTION (NEW)
+# ============================================================================
+
+@app.route('/execute/<task_type>', methods=['POST'])
+@require_auth
+def execute_workflow(task_type):
+    """
+    Execute a dynamic workflow by its task type name.
+    
+    This Generic Endpoint supports any YAML-defined workflow.
+    Example: /execute/ai_assistant matches workflows/ai_assistant.yaml
+    
+    Request Body:
+        {
+            "instruction": "...",
+            "other_param": "..."
+        }
+    """
+    # 1. Skip if it's one of the hardcoded types (backward compatibility)
+    if task_type in ['url', 'ai']:
+        return jsonify({"error": f"Use dedicated endpoint /execute/{task_type}"}), 400
+    
+    # 2. Lookup workflow
+    workflow = workflow_registry.get_by_name(task_type) or workflow_registry.get_by_endpoint(task_type)
+    
+    if not workflow:
+        return jsonify({"error": f"Unknown task type: {task_type}"}), 404
+        
+    # 3. Validate inputs
+    data = request.json or {}
+    for input_spec in workflow.inputs:
+        name = input_spec['name']
+        required = input_spec.get('required', False)
+        if required and name not in data:
+            return jsonify({"error": f"Missing required input: {name}"}), 400
+            
+    # 4. Check capabilities
+    if task_queue is None:
+        return jsonify({"error": "Task queue not initialized"}), 500
+        
+    try:
+        # 5. Create Configurable Task
+        task = task_manager.create_configurable_task(workflow, data)
+        logger.info(f"Created generic task {task.task_id} for workflow: {workflow.name}")
+        
+        # 6. Submit to Queue
+        task_queue.submit(task)
+        
+        # 7. Get queue position
+        queue_status = task_queue.get_status()
+        is_current = queue_status['current'] and queue_status['current']['task_id'] == task.task_id
+        queue_position = 0 if is_current else len([t for t in queue_status['queued'] if t['task_id'] == task.task_id])
+        
+        return jsonify({
+            "status": "started" if is_current else "queued",
+            "task_id": task.task_id,
+            "task_type": task_type,
+            "workflow_name": workflow.name,
+            "queue_position": queue_position
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Failed to submit workflow task: {e}")
         return jsonify({"error": str(e)}), 500
 
 

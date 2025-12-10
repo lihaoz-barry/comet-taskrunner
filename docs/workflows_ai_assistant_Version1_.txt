@@ -1,0 +1,186 @@
+# ============================================================================
+# Comet Task Runner - AI Assistant Workflow Configuration
+# ============================================================================
+# Task Type: AI Assistant Interaction
+# API Endpoint: /execute/ai
+# Description: Automates interaction with AI Assistant in Comet browser
+# ============================================================================
+
+workflow:
+  name:  "ai_assistant"
+  display_name: "AI Assistant"
+  version: "1.0.0"
+  description: "Automated AI Assistant interaction workflow"
+  api_endpoint: "/execute/ai"
+  
+  # Template images location (relative to templates/ folder)
+  template_dir: "ai"
+  
+  # Required input parameters
+  inputs:
+    - name: instruction
+      type: string
+      required: true
+      description: "The text instruction for AI Assistant"
+
+# ============================================================================
+# AUTOMATION STEPS
+# ============================================================================
+steps:
+  # --------------------------------------------------------------------------
+  # Step 1: Wait for browser initialization
+  # --------------------------------------------------------------------------
+  - id: "step_1"
+    name: "wait_initialization"
+    display_name: "Wait for Browser"
+    action: "wait"
+    config:
+      duration:  3. 0  # seconds
+      description: "Allow browser to fully load"
+
+  # --------------------------------------------------------------------------
+  # Step 2: Activate browser window
+  # --------------------------------------------------------------------------
+  - id: "step_2"
+    name:  "activate_window"
+    display_name: "Activate Window"
+    action:  "window"
+    config: 
+      operation: "activate"
+      window_title_pattern: "Comet"  # Partial match
+      retry_count: 3
+      retry_delay: 1.0
+
+  # --------------------------------------------------------------------------
+  # Step 3: Find Assistant button using template matching
+  # --------------------------------------------------------------------------
+  - id:  "step_3"
+    name: "find_assistant"
+    display_name:  "Find Assistant Button"
+    action:  "detect"
+    config: 
+      template:  "comet_Assistant_Unactive.png"
+      threshold: 0.3  # Fuzzy matching (lower = more fuzzy)
+      region: null    # null = full screen, or [x, y, width, height]
+      timeout: 10.0   # seconds to keep searching
+      retry_interval: 0.5
+    outputs:
+      - name: "assistant_coords"
+        type:  "coordinates"
+
+  # --------------------------------------------------------------------------
+  # Step 4: Click Assistant button
+  # --------------------------------------------------------------------------
+  - id: "step_4"
+    name: "click_assistant"
+    display_name: "Click Assistant"
+    action: "click"
+    config: 
+      coordinates_from: "step_3.assistant_coords"  # Reference previous step
+      click_type: "single"  # single, double, right
+      pre_delay: 0.1
+      post_delay: 0.5
+
+  # --------------------------------------------------------------------------
+  # Step 5: Find input box using template matching
+  # --------------------------------------------------------------------------
+  - id: "step_5"
+    name: "find_input_box"
+    display_name: "Find Input Box"
+    action:  "detect"
+    config:
+      template: "comet_input_box. png"
+      threshold: 0.5  # More strict matching
+      timeout: 10.0
+      retry_interval: 0.5
+    outputs: 
+      - name: "input_coords"
+        type: "coordinates"
+
+  # --------------------------------------------------------------------------
+  # Step 6: Click input box and type instruction
+  # --------------------------------------------------------------------------
+  - id:  "step_6"
+    name: "input_text"
+    display_name:  "Type Prompt"
+    action:  "click_and_type"
+    config:
+      coordinates_from: "step_5.input_coords"
+      text_from: "inputs.instruction"  # Reference input parameter
+      typing_delay: 0.02  # seconds between keystrokes
+      pre_click_delay: 0.1
+      post_type_delay: 0.3
+
+  # --------------------------------------------------------------------------
+  # Step 7: Send instruction (press Enter)
+  # --------------------------------------------------------------------------
+  - id: "step_7"
+    name: "send_instruction"
+    display_name: "Send Instruction"
+    action: "key_press"
+    config:
+      key: "enter"
+      # Special handling for slash commands
+      conditions:
+        - if: "inputs.instruction.startswith('/')"
+          then:
+            repeat:  2  # Press Enter twice for slash commands
+            delay_between: 0.1
+          else:
+            repeat: 1
+      post_delay: 0.5
+
+  # --------------------------------------------------------------------------
+  # Step 8: Monitor for completion (detect stop logo disappearing)
+  # --------------------------------------------------------------------------
+  - id: "step_8"
+    name: "detect_stop_logo"
+    display_name: "Monitor Completion"
+    action: "detect_loop"
+    config:
+      template:  "comet_stop_logo.png"
+      threshold: 0.7  # High threshold for accuracy
+      mode: "wait_until_disappears"  # Wait until logo is NOT found
+      check_interval: 2.0  # Check every 2 seconds
+      timeout: 300.0  # 5 minutes max
+      on_timeout: "continue"  # continue, fail, or callback
+
+  # --------------------------------------------------------------------------
+  # Step 9: Handle completion
+  # --------------------------------------------------------------------------
+  - id: "step_9"
+    name: "handle_completion"
+    display_name: "Finalize"
+    action: "completion"
+    config:
+      actions:
+        - type: "log"
+          message:  "Task completed successfully"
+        # Future extensions: 
+        # - type: "screenshot"
+        #   save_to: "results/{task_id}_final.png"
+        # - type: "notify"
+        #   method: "webhook"
+        #   url: "https://example.com/callback"
+
+# ============================================================================
+# ERROR HANDLING
+# ============================================================================
+error_handling:
+  on_step_failure:  "abort"  # abort, skip, retry
+  max_retries: 3
+  retry_delay: 1.0
+  screenshot_on_error: true
+  screenshot_path: "errors/{task_id}_{step_name}. png"
+
+# ============================================================================
+# METADATA
+# ============================================================================
+metadata:
+  author: "lihaoz-barry"
+  created_at: "2025-12-09"
+  last_modified: "2025-12-09"
+  tags:
+    - "ai"
+    - "assistant"
+    - "automation"

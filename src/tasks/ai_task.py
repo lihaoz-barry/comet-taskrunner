@@ -68,7 +68,7 @@ class AITask(BaseTask):
     """
     AI Assistant Interaction Task with OpenCV Automation.
     
-    7-Step Automation Sequence:
+    9-Step Automation Sequence:
     1. Launch Comet browser
     2. Activate window (force focus)
     3. Find Assistant button (template matching)
@@ -76,18 +76,22 @@ class AITask(BaseTask):
     5. Find input box (template matching)
     6. Input prompt text
     7. Send instruction (Enter key)
+    8. Periodic stop logo detection (every 2 seconds)
+    9. Completion handler
     """
     
     # Template files (just filenames, path is in template_dir)
     TEMPLATES = {
         'assistant_button': 'comet_Assistant_Unactive.png',
         'input_box': 'comet_input_box.png',  # User needs to create this
+        'stop_logo': 'comet_stop_logo.png',  # Stop detection logo
     }
     
     # Matching thresholds
     THRESHOLDS = {
-        'assistant_button': 0.3,  # Fuzzy matching
+        'assistant_button': 0.6,  # Fuzzy matching
         'input_box': 0.5,  # More strict
+        'stop_logo': 0.7,  # Higher threshold for accurate stop detection
     }
     
     # Step descriptions for overlay
@@ -205,7 +209,7 @@ class AITask(BaseTask):
     
     def _automation_sequence(self):
         """
-        MAIN AUTOMATION SEQUENCE - 7 Steps
+        MAIN AUTOMATION SEQUENCE - 9 Steps
         
         Runs in background thread.
         """
@@ -268,6 +272,18 @@ class AITask(BaseTask):
                 self.fail(f"Step 7 failed: {result.error}")
                 return
             
+            # Step 8: Detect stop logo
+            result = self._step_8_detect_stop_logo()
+            if not result.success:
+                self.fail(f"Step 8 failed: {result.error}")
+                return
+            
+            # Step 9: Handle completion
+            result = self._step_9_handle_completion()
+            if not result.success:
+                self.fail(f"Step 9 failed: {result.error}")
+                return
+            
             logger.info("="*60)
             logger.info("✓ AUTOMATION SEQUENCE COMPLETED SUCCESSFULLY")
             logger.info("="*60)
@@ -327,7 +343,7 @@ class AITask(BaseTask):
     def _step_1_wait_for_initialization(self):
         """Step 1: Wait for browser to initialize"""
         logger.info("")
-        logger.info("[STEP 1/7] Waiting for browser initialization...")
+        logger.info("[STEP 1/9] Waiting for browser initialization...")
         
         time.sleep(8)  # Give Comet more time to start (increased from 5s)
         
@@ -340,7 +356,7 @@ class AITask(BaseTask):
     def _step_2_activate_window(self) -> StepResult:
         """Step 2: Find and activate Comet window"""
         logger.info("")
-        logger.info("[STEP 2/7] Activating Comet window...")
+        logger.info("[STEP 2/9] Activating Comet window...")
         
         try:
             # Find window - with filtering to exclude frontend
@@ -399,9 +415,14 @@ class AITask(BaseTask):
     def _step_3_find_assistant(self) -> StepResult:
         """Step 3: Find Assistant button using template matching"""
         logger.info("")
-        logger.info("[STEP 3/7] Finding Assistant button...")
+        logger.info("[STEP 3/9] Finding Assistant button...")
         
         try:
+            # Refresh window position before screenshot
+            if not self._refresh_window_position():
+                return StepResult("find_assistant", False, 
+                                error="Window position refresh failed")
+            
             # Take screenshot
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             screenshot_path = self.screenshot_dir / f"assistant_button_{timestamp}.png"
@@ -445,7 +466,7 @@ class AITask(BaseTask):
     def _step_4_click_assistant(self, coordinates: tuple) -> StepResult:
         """Step 4: Click Assistant button"""
         logger.info("")
-        logger.info("[STEP 4/7] Clicking Assistant button...")
+        logger.info("[STEP 4/9] Clicking Assistant button...")
         
         try:
             x, y = coordinates
@@ -475,9 +496,14 @@ class AITask(BaseTask):
     def _step_5_find_input_box(self) -> StepResult:
         """Step 5: Find input box using template matching"""
         logger.info("")
-        logger.info("[STEP 5/7] Finding input box...")
+        logger.info("[STEP 5/9] Finding input box...")
         
         try:
+            # Refresh window position before screenshot
+            if not self._refresh_window_position():
+                return StepResult("find_input_box", False,
+                                error="Window position refresh failed")
+            
             # Take new screenshot (UI has changed after clicking Assistant)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             screenshot_path = self.screenshot_dir / f"input_box_{timestamp}.png"
@@ -544,7 +570,7 @@ class AITask(BaseTask):
     def _step_6_input_text(self, coordinates: tuple) -> StepResult:
         """Step 6: Click input box and type prompt"""
         logger.info("")
-        logger.info("[STEP 6/7] Inputting prompt text...")
+        logger.info("[STEP 6/9] Inputting prompt text...")
         
         try:
             x, y = coordinates
@@ -577,7 +603,7 @@ class AITask(BaseTask):
     def _step_7_send(self) -> StepResult:
         """Step 7: Send instruction (press Enter)"""
         logger.info("")
-        logger.info("[STEP 7/7] Sending instruction...")
+        logger.info("[STEP 7/9] Sending instruction...")
         
         try:
             # Check if prompt starts with "/" (slash command)
@@ -608,27 +634,216 @@ class AITask(BaseTask):
             self.step_results.append(step_result)
             return step_result
     
+    def _refresh_window_position(self) -> bool:
+        """
+        Refresh window position before taking screenshot.
+        
+        This ensures we always capture the correct area even if:
+        - User moved the window
+        - User resized the window
+        - Window was minimized/restored
+        
+        Returns:
+            bool: True if window found and position updated
+        """
+        try:
+            import win32gui
+            import win32con
+            
+            # Check if window still exists
+            if not self.hwnd or not win32gui.IsWindow(self.hwnd):
+                logger.warning("  ⚠ Window handle invalid, searching for window again...")
+                result = WindowManager.find_comet_window(keywords=["New Tab - Comet", "Comet"])
+                if not result:
+                    logger.error("  ✗ Could not find Comet window")
+                    return False
+                self.hwnd, self.window_rect = result
+                logger.info(f"  ✓ Window re-acquired: {self.window_rect}")
+                return True
+            
+            # Get current window position
+            new_rect = win32gui.GetWindowRect(self.hwnd)
+            
+            # Check if position changed
+            if new_rect != self.window_rect:
+                old_rect = self.window_rect
+                self.window_rect = new_rect
+                logger.info(f"  ↻ Window position updated: {old_rect} → {new_rect}")
+            
+            # Check if window is minimized
+            if win32gui.IsIconic(self.hwnd):
+                logger.warning("  ⚠ Window is minimized, restoring...")
+                win32gui.ShowWindow(self.hwnd, win32con.SW_RESTORE)
+                time.sleep(0.3)
+                self.window_rect = win32gui.GetWindowRect(self.hwnd)
+                logger.info(f"  ✓ Window restored: {self.window_rect}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"  ✗ Failed to refresh window position: {e}")
+            return False
+    
+    def _step_8_detect_stop_logo(self) -> StepResult:
+        """Step 8: Periodically detect stop logo to determine task completion"""
+        logger.info("")
+        logger.info("[STEP 8/9] Monitoring for stop logo...")
+        
+        try:
+            max_attempts = 150  # 150 attempts * 2 seconds = 5 minutes max
+            attempt = 0
+            
+            while attempt < max_attempts:
+                attempt += 1
+                logger.info(f"  → Detection attempt {attempt}/{max_attempts}...")
+                
+                # Refresh window position EVERY iteration (critical for long monitoring)
+                if not self._refresh_window_position():
+                    logger.warning("  ⚠ Window position refresh failed, retrying...")
+                    time.sleep(2)
+                    continue
+                
+                # Take screenshot with current position
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                screenshot_path = self.screenshot_dir / f"stop_detection_{timestamp}.png"
+                
+                screenshot = ScreenshotCapture.capture_window(self.window_rect, str(screenshot_path))
+                
+                # Template matching
+                template_path = self.template_dir / self.TEMPLATES['stop_logo']
+                
+                # Check if template exists
+                if not template_path.exists():
+                    logger.warning(f"  ⚠ Stop logo template not found: {template_path}")
+                    logger.warning(f"  ⚠ Skipping stop detection")
+                    step_result = StepResult("detect_stop_logo", True,
+                                           data={'method': 'skipped', 'reason': 'template_not_found'})
+                    self.step_results.append(step_result)
+                    return step_result
+                
+                threshold = self.THRESHOLDS['stop_logo']
+                
+                coordinates = PatternMatcher.find_pattern(
+                    str(screenshot_path),
+                    str(template_path),
+                    self.window_rect,
+                    threshold
+                )
+                
+                if coordinates:
+                    logger.info(f"  ✓ Stop logo detected at: {coordinates}")
+                    logger.info(f"  ✓ Task completion detected after {attempt} attempts")
+                    step_result = StepResult("detect_stop_logo", True,
+                                           data={'coordinates': coordinates, 'attempts': attempt})
+                    self.step_results.append(step_result)
+                    return step_result
+                
+                # Wait 2 seconds before next attempt
+                time.sleep(2)
+            
+            # Max attempts reached without detection
+            logger.warning(f"  ⚠ Stop logo not detected after {max_attempts} attempts")
+            logger.warning(f"  ⚠ Proceeding to completion anyway")
+            step_result = StepResult("detect_stop_logo", True,
+                                   data={'method': 'timeout', 'attempts': max_attempts})
+            self.step_results.append(step_result)
+            return step_result
+            
+        except Exception as e:
+            error = f"Stop logo detection error: {e}"
+            logger.error(f"  ✗ {error}")
+            step_result = StepResult("detect_stop_logo", False, error=error)
+            self.step_results.append(step_result)
+            return step_result
+    
+    def _step_9_handle_completion(self) -> StepResult:
+        """Step 9: Handle task completion"""
+        logger.info("")
+        logger.info("[STEP 9/9] Handling task completion...")
+        
+        try:
+            # Placeholder for completion actions
+            # Future: Could include actions like:
+            # - Taking final screenshot
+            # - Extracting results from UI
+            # - Sending notifications
+            # - Cleanup operations
+            
+            logger.info("  → Executing completion handler...")
+            
+            # For now, just log completion
+            logger.info("  ✓ Task completion handler executed")
+            
+            step_result = StepResult("handle_completion", True,
+                                   data={'completion_time': datetime.now().isoformat()})
+            self.step_results.append(step_result)
+            return step_result
+            
+        except Exception as e:
+            error = f"Completion handler error: {e}"
+            logger.error(f"  ✗ {error}")
+            step_result = StepResult("handle_completion", False, error=error)
+            self.step_results.append(step_result)
+            return step_result
+    
     # ========================================================================
-    # PROGRESS TRACKING
+    # PROGRESS TRACKING (STANDARDIZED)
     # ========================================================================
+    
+    def get_progress(self) -> Dict[str, Any]:
+        """
+        Get standardized progress information for AI task.
+        
+        AI tasks have 9 discrete automation steps.
+        """
+        total_steps = 9
+        completed_steps = len([r for r in self.step_results if r.success])
+        current_step = len(self.step_results) if len(self.step_results) < 9 else 9
+        progress_percent = int((completed_steps / total_steps) * 100)
+        
+        # Get human-readable status text
+        status_text = "Initializing..."
+        if current_step > 0 and current_step <= len(self.step_results):
+            last_step = self.step_results[-1]
+            step_names = {
+                'wait_initialization': 'Waiting for browser',
+                'activate_window': 'Activating window',
+                'find_assistant': 'Finding Assistant button',
+                'click_assistant': 'Clicking Assistant',
+                'find_input_box': 'Finding input box',
+                'input_text': 'Typing prompt',
+                'send_instruction': 'Sending instruction',
+                'detect_stop_logo': 'Monitoring for completion',
+                'handle_completion': 'Finalizing'
+            }
+            status_text = step_names.get(last_step.step_name, last_step.step_name)
+        
+        return {
+            'has_steps': True,
+            'current_step': current_step,
+            'total_steps': total_steps,
+            'progress_percent': progress_percent,
+            'status_text': status_text,
+            'details': {
+                'instruction': self.instruction[:50] + '...' if len(self.instruction) > 50 else self.instruction,
+                'step_results': [r.to_dict() for r in self.step_results],
+                'task_type': 'ai'
+            }
+        }
     
     def get_automation_progress(self) -> Dict[str, Any]:
         """
-        Get automation progress information.
+        DEPRECATED: Use get_progress() instead.
         
-        Returns:
-            Dict with progress details
+        Kept for backward compatibility.
         """
-        total_steps = 7
-        completed_steps = len([r for r in self.step_results if r.success])
-        current_step = len(self.step_results) if len(self.step_results) < 7 else 7
-        
+        progress = self.get_progress()
         return {
-            'total_steps': total_steps,
-            'completed_steps': completed_steps,
-            'current_step': current_step,
-            'progress_percent': int((completed_steps / total_steps) * 100),
-            'step_details': [r.to_dict() for r in self.step_results]
+            'total_steps': progress['total_steps'],
+            'current_step': progress['current_step'],
+            'completed_steps': len([r for r in self.step_results if r.success]),
+            'progress_percent': progress['progress_percent'],
+            'step_details': progress['details']['step_results']
         }
     
     # ========================================================================

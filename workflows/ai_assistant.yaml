@@ -1,0 +1,171 @@
+workflow:
+  name: "ai_assistant"
+  display_name: "AI Assistant"
+  version: "1.0.0"
+  description: "Automated AI Assistant interaction workflow"
+  api_endpoint: "/execute/ai_assistant"
+  template_dir: "templates/ai"
+
+inputs:
+  - name: "instruction"
+    type: "string"
+    required: true
+    description: "The text instruction for AI Assistant"
+
+steps:
+  # --------------------------------------------------------------------------
+  # Step 1: Wait for browser initialization
+  # --------------------------------------------------------------------------
+  - id: "step_1"
+    name: "wait_initialization"
+    display_name: "Wait for Browser"
+    action: "wait"
+    config:
+      duration: 3.0
+      description: "Allow browser to fully load"
+
+  # --------------------------------------------------------------------------
+  # Step 2: Activate browser window
+  # --------------------------------------------------------------------------
+  - id: "step_2"
+    name: "activate_window"
+    display_name: "Activate/Launch Window"
+    action: "window"
+    config:
+      operation: "activate_or_launch"
+      window_title_pattern: "Comet"
+      exclude_title: "Task Runner"
+      require_process: "comet.exe"
+      launch_config:
+        registry_key: "Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\comet.exe"
+        fallback_path: "C:\\Users\\Barry\\AppData\\Local\\Perplexity\\Comet\\Application\\comet.exe"
+      retry_count: 5
+      retry_delay: 2.0
+
+  # --------------------------------------------------------------------------
+  # Step 3: Find Assistant button using template matching
+  # --------------------------------------------------------------------------
+  - id: "step_3"
+    name: "find_assistant"
+    display_name: "Find Assistant Button"
+    action: "detect"
+    config:
+      template: "comet_Assistant_Unactive.png"
+      threshold: 0.7
+      timeout: 10.0
+      retry_interval: 0.5
+    outputs:
+      - name: "coordinates"
+
+  # --------------------------------------------------------------------------
+  # Step 4: Click Assistant button
+  # --------------------------------------------------------------------------
+  - id: "step_4"
+    name: "click_assistant"
+    display_name: "Click Assistant"
+    action: "click"
+    config:
+      # Reference previous step output
+      coordinates: "step_3.coordinates"
+      click_type: "single"
+      pre_delay: 0.1
+      post_delay: 0.5
+
+  # --------------------------------------------------------------------------
+  # Step 5: Find input box using template matching
+  # --------------------------------------------------------------------------
+  - id: "step_5"
+    name: "find_input_box"
+    display_name: "Find Input Box"
+    action: "detect"
+    config:
+      template: "comet_input_box.png"
+      threshold: 0.7
+      timeout: 10.0
+      retry_interval: 0.5
+    outputs:
+      - name: "coordinates"
+
+  # --------------------------------------------------------------------------
+  # Step 6: Click input box and type instruction
+  # --------------------------------------------------------------------------
+  - id: "step_6"
+    name: "input_text"
+    display_name: "Type Prompt"
+    action: "click_and_type"
+    config:
+      coordinates: "step_5.coordinates"
+      text: "inputs.instruction"
+      typing_delay: 0.02
+      pre_click_delay: 0.1
+      post_type_delay: 0.3
+
+  # --------------------------------------------------------------------------
+  # Step 7: Send instruction (press Enter)
+  # --------------------------------------------------------------------------
+  - id: "step_7"
+    name: "send_instruction"
+    display_name: "Send Instruction"
+    action: "key_press"
+    config:
+      key: "enter"
+      # Simple logic: if instruction starts with /, press twice
+      # Note: Complex condition logic might need a dedicated LogicAction or specialized config
+      # For now, we'll rely on the action implementation handling the 'smart_enter' or similar
+      # Or just map it to the param directly.
+      # The original file had a "conditions" block. 
+      # Since we haven't implemented a "ConditionAction", I'll pass the instruction to the key_press action
+      # and let the action handle the "slash command" logic if needed, or implement a specific action.
+      # Ideally, "key_press" should be simple. 
+      # Let's add a "smart_enter" flag or similar, or just pass the text context.
+      text_context: "inputs.instruction"
+      post_delay: 0.5
+
+  # --------------------------------------------------------------------------
+  # Step 8: Monitor for completion (detect stop logo disappearing)
+  # --------------------------------------------------------------------------
+  # --------------------------------------------------------------------------
+  # Step 8: Wait for processing to start (Stop logo appears)
+  # --------------------------------------------------------------------------
+  - id: "step_8"
+    name: "detect_processing_start"
+    display_name: "Wait for Processing"
+    action: "detect_loop"
+    config:
+      template: "comet_stop_logo.png"
+      threshold: 0.8
+      mode: "wait_until_appears"
+      check_interval: 0.5
+      timeout: 30.0 # Give it time to start
+      on_timeout: "fail" # If it never starts, fail
+
+  # --------------------------------------------------------------------------
+  # Step 9: Wait for processing to finish (Stop logo disappears)
+  # --------------------------------------------------------------------------
+  - id: "step_9"
+    name: "detect_processing_end"
+    display_name: "Wait for Completion"
+    action: "detect_loop"
+    config:
+      template: "comet_stop_logo.png"
+      threshold: 0.8
+      mode: "wait_until_disappears"
+      check_interval: 2.0
+      timeout: 300.0
+      on_timeout: "fail" # If it never finishes, fail
+
+  # --------------------------------------------------------------------------
+  # Step 10: Handle completion
+  # --------------------------------------------------------------------------
+  - id: "step_10"
+    name: "handle_completion"
+    display_name: "Finalize"
+    action: "completion"
+    config:
+      status: "success"
+      message: "Task completed successfully"
+
+error_handling:
+  on_step_failure: "abort"
+  max_retries: 3
+  retry_delay: 1.0
