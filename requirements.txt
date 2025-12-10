@@ -8,3 +8,4 @@ mss>=9.0.0
 pyautogui>=0.9.50
 Pillow>=10.0.0
 pywin32>=305
+PyYAML>=6.0

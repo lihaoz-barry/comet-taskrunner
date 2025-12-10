@@ -78,7 +78,7 @@ class AITask(BaseTask):
     
     # Matching thresholds
     THRESHOLDS = {
-        'assistant_button': 0.3,  # Fuzzy matching
+        'assistant_button': 0.6,  # Fuzzy matching
         'input_box': 0.5,  # More strict
         'stop_logo': 0.7,  # Higher threshold for accurate stop detection
     }

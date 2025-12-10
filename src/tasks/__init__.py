@@ -25,5 +25,6 @@ Usage in other projects:
 from .base_task import BaseTask, TaskStatus, TaskType
 from .url_task import URLTask
 from .ai_task import AITask
+from .configurable_task import ConfigurableTask
 
-__all__ = ['BaseTask', 'TaskStatus', 'TaskType', 'URLTask', 'AITask']
+__all__ = ['BaseTask', 'TaskStatus', 'TaskType', 'URLTask', 'AITask', 'ConfigurableTask']

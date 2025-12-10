@@ -31,24 +31,29 @@ class WindowManager:
     """
     
     @staticmethod
-    def find_comet_window(keywords: list = None) -> Optional[Tuple[int, Tuple[int, int, int, int]]]:
+    def find_comet_window(keywords: list = None, exclude_title: str = None, require_process: str = None) -> Optional[Tuple[int, Tuple[int, int, int, int]]]:
         """
-        Find Comet browser window by title.
+        Find Comet browser window by title and optionally process name.
         
         Args:
-            keywords: List of keywords to search (default: ["Comet", "Perplexity"])
+            keywords: List of keywords to search
+            exclude_title: Optional string, skip window if title contains this
+            require_process: Optional string, exact process name (e.g. "comet.exe")
             
         Returns:
             Tuple of (hwnd, rect) or None if not found
-            rect is (left, top, right, bottom)
         """
         if keywords is None:
             keywords = ["Comet", "Perplexity"]
             
-        # Keywords to explicitly exclude (to avoid matching the backend console itself)
-        exclude_keywords = ["backend.exe", "python.exe", "cmd.exe", "powershell.exe", "comet-taskrunner", ".py"]
+        # Keywords to explicitly exclude (to avoid matching the backend console, IDE, or file explorer)
+        exclude_keywords = ["backend.exe", "python.exe", "cmd.exe", "powershell.exe", ".py", 
+                          "comet-taskrunner", "Antigravity", "Visual Studio Code"]
+        # Also exclude based on param
+        if exclude_title:
+            exclude_keywords.append(exclude_title)
         
-        logger.info(f"Searching for window with keywords: {keywords}")
+        logger.info(f"Searching for window with keywords: {keywords} (excluding: {exclude_keywords}, process: {require_process})")
         
         found_windows = []
         
@@ -60,20 +65,28 @@ class WindowManager:
                 title = win32gui.GetWindowText(hwnd).lower()
                 
                 # Check exclusion list first
-                if any(ex in title for ex in exclude_keywords):
+                if any(ex.lower() in title for ex in exclude_keywords):
                     return True
                 
                 # Check if ANY keyword matches
                 if any(keyword.lower() in title for keyword in keywords):
-                    rect = win32gui.GetWindowRect(hwnd)
+                    # Check Process Name if required
                     _, pid = win32process.GetWindowThreadProcessId(hwnd)
+                    if require_process:
+                        proc_name = WindowManager._get_process_name(pid)
+                        if not proc_name or proc_name.lower() != require_process.lower():
+                            # mismatch
+                            return True
+
+                    rect = win32gui.GetWindowRect(hwnd)
                     found_windows.append({
                         'hwnd': hwnd,
                         'title': win32gui.GetWindowText(hwnd),
                         'rect': rect,
                         'pid': pid
                     })
-            except:
+            except Exception as e:
+                # logger.warning(f"Error checking window {hwnd}: {e}")
                 pass
             
             return True
@@ -85,17 +98,35 @@ class WindowManager:
             return None
         
         if not found_windows:
-            logger.warning(f"No windows found matching keywords: {keywords}")
+            logger.warning(f"No match found for keywords={keywords}, process={require_process}")
             return None
         
         # Use first window
         window = found_windows[0]
         logger.info(f"Found window: HWND={window['hwnd']}, Title='{window['title']}', PID={window['pid']}")
         
-        if len(found_windows) > 1:
-            logger.info(f"Multiple windows found ({len(found_windows)}), using first one")
-        
         return (window['hwnd'], window['rect'])
+
+    @staticmethod
+    def _get_process_name(pid: int) -> Optional[str]:
+        """Get executable name from PID"""
+        try:
+            # Try psutil first if available (cleaner)
+            try:
+                import psutil
+                return psutil.Process(pid).name()
+            except ImportError:
+                pass
+                
+            # Fallback to pywin32
+            handle = win32api.OpenProcess(win32con.PROCESS_QUERY_INFORMATION | win32con.PROCESS_VM_READ, False, pid)
+            try:
+                path = win32process.GetModuleFileNameEx(handle, 0)
+                return Path(path).name
+            finally:
+                win32api.CloseHandle(handle)
+        except Exception:
+            return None
     
     @staticmethod
     def activate_window(hwnd: int) -> bool:
@@ -193,6 +224,25 @@ class WindowManager:
             logger.error(f"Complete failure to activate window: {e}")
             return False
     
+    @staticmethod
+    def close_window(hwnd: int) -> bool:
+        """
+        Close a window using WM_CLOSE message.
+        
+        Args:
+            hwnd: Window handle
+            
+        Returns:
+            True if message sent successfully
+        """
+        try:
+            logger.info(f"Closing window HWND={hwnd}")
+            win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to close window: {e}")
+            return False
+
     @staticmethod
     def get_application_path(registry_subkey: str, fallback_path: str) -> Optional[str]:
         """

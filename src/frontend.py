@@ -302,7 +302,8 @@ class CometRunnerApp:
         def run_ai_request():
             try:
                 # Call the AI task API endpoint
-                response = requests.post(f"{BACKEND_URL}/execute/ai", json={"instruction": prompt})
+                # Switch to new configurable workflow endpoint
+                response = requests.post(f"{BACKEND_URL}/execute/ai_assistant", json={"instruction": prompt})
                 
                 if response.status_code == 200:
                     data = response.json()
