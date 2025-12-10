@@ -34,9 +34,12 @@ from automation import WindowManager, ScreenshotCapture, PatternMatcher, MouseCo
 try:
     from overlay import StatusOverlay, OverlayConfig
     OVERLAY_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     OVERLAY_AVAILABLE = False
-    logging.warning("Overlay module not available")
+    # Log the specific import error for debugging
+    logging.warning(f"Overlay module not available: {e}")
+    logging.warning(f"Python path: {sys.path}")
+    logging.warning("Tkinter overlay features will be disabled")
 
 logger = logging.getLogger(__name__)
 

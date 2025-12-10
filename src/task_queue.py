@@ -142,38 +142,55 @@ class TaskQueue:
         logger.info("TaskQueue monitor thread started")
         
         loop_count = 0
+        last_status_hash = None  # Track if status changed
+
         while self.monitoring:
             time.sleep(1)  # Check every second
             loop_count += 1
-            
+
             with self.lock:
-                # Log detailed status every 2 seconds
-                if loop_count % 2 == 0:
+                # Only log status when:
+                # 1. There is active work (current task or queued tasks)
+                # 2. Every 30 seconds (instead of 2) when idle
+                has_work = self.current_task is not None or len(self.queue) > 0
+                should_log = has_work or (loop_count % 30 == 0)
+
+                # Also log when status changes (task starts/completes)
+                current_status_hash = (
+                    self.current_task.task_id if self.current_task else None,
+                    len(self.queue),
+                    len(self.completed_tasks)
+                )
+                status_changed = current_status_hash != last_status_hash
+
+                if should_log or status_changed:
+                    last_status_hash = current_status_hash
+
                     logger.info("=" * 60)
                     logger.info("📊 TASK QUEUE STATUS")
                     logger.info("=" * 60)
-                    
+
                     if self.current_task:
                         task_type = self.current_task.task_type.value
                         task_id = self.current_task.task_id[:8]
                         status = self.current_task.status.value
-                        
+
                         # Get automation progress for AI tasks
                         progress_info = ""
                         if hasattr(self.current_task, 'get_automation_progress'):
                             prog = self.current_task.get_automation_progress()
                             progress_info = f" - Step {prog.get('current_step', 0)}/{prog.get('total_steps', 7)}"
-                        
+
                         logger.info(f"→ CURRENT: [{task_type.upper()}] {task_id} - {status}{progress_info}")
                     else:
                         logger.info("→ CURRENT: <idle>")
-                    
+
                     logger.info(f"📋 QUEUED: {len(self.queue)} task(s)")
                     for i, task in enumerate(list(self.queue)):
                         task_type = task.task_type.value
                         task_id = task.task_id[:8]
                         logger.info(f"   {i+1}. [{task_type.upper()}] {task_id}")
-                    
+
                     logger.info(f"✓ COMPLETED: {len(self.completed_tasks)} task(s)")
                     for task in list(self.completed_tasks):
                         task_type = task.task_type.value

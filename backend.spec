@@ -38,6 +38,21 @@ a = Analysis(
         'mss',
         'pyautogui',
         'PIL',  # Pillow
+        # Tkinter for overlay system
+        'tkinter',
+        'tkinter.ttk',
+        '_tkinter',
+        # Overlay modules
+        'overlay',
+        'overlay.status_overlay',
+        'overlay.overlay_config',
+        'overlay.keyboard_handler',
+        'overlay.system_tray',
+        # Keyboard module for ESC cancellation
+        'keyboard',
+        # pystray for system tray
+        'pystray',
+        'pystray._win32',
         # Task modules
         'tasks',
         'tasks.base_task',
@@ -56,10 +71,13 @@ a = Analysis(
     runtime_hooks=[],
     excludes=[
         # Exclude unnecessary modules to reduce size
-        'tkinter',  # Frontend uses this, but backend doesn't
+        # Note: tkinter is now INCLUDED for overlay system
         'matplotlib',
         'pandas',
         'scipy',
+        'jupyter',
+        'notebook',
+        'IPython',
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
