@@ -22,6 +22,14 @@ from pathlib import Path
 # Import task components
 from tasks import BaseTask, TaskStatus, TaskType
 
+# Import overlay (optional)
+try:
+    from overlay import StatusOverlay, OverlayConfig
+    OVERLAY_AVAILABLE = True
+except ImportError:
+    OVERLAY_AVAILABLE = False
+    logging.warning("Overlay not available in TaskQueue")
+
 logger = logging.getLogger(__name__)
 
 
@@ -42,7 +50,7 @@ class TaskQueue:
     def __init__(self, comet_path: str):
         """
         Initialize task queue.
-        
+
         Args:
             comet_path: Path to Comet browser executable
         """
@@ -51,12 +59,24 @@ class TaskQueue:
         self.completed_tasks: deque = deque(maxlen=10)  # Keep last 10
         self.lock = threading.Lock()
         self.comet_path = comet_path
-        
+
+        # Overlay system (managed at queue level)
+        self.overlay = None
+        self.overlay_task_id = None  # Track which task owns the overlay
+        if OVERLAY_AVAILABLE:
+            try:
+                self.overlay = StatusOverlay()
+                self.overlay.set_cancel_callback(self._cancel_current_task)
+                logger.info("✓ TaskQueue overlay initialized")
+            except Exception as e:
+                logger.warning(f"Failed to initialize TaskQueue overlay: {e}")
+                self.overlay = None
+
         # Start monitoring thread
         self.monitoring = True
         self.monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self.monitor_thread.start()
-        
+
         logger.info("TaskQueue initialized")
     
     # ========================================================================
@@ -95,12 +115,27 @@ class TaskQueue:
     def _execute_task(self, task: BaseTask):
         """
         Execute a task (internal method, assumes lock is held).
-        
+
         Args:
             task: Task to execute
         """
         self.current_task = task
-        
+
+        # Show overlay for AI tasks
+        if self.overlay and task.task_type == TaskType.AI_ASSISTANT:
+            try:
+                self.overlay_task_id = task.task_id
+                self.overlay.show()
+                self.overlay.update_status(
+                    current_step=0,
+                    total_steps=7,
+                    step_description="准备启动自动化任务...",
+                    next_step_description="等待浏览器初始化"
+                )
+                logger.info(f"Overlay displayed for task {task.task_id}")
+            except Exception as e:
+                logger.warning(f"Failed to show overlay: {e}")
+
         try:
             # Execute task and get process ID
             process_id = task.execute(comet_path=self.comet_path)
@@ -109,9 +144,27 @@ class TaskQueue:
         except Exception as e:
             logger.error(f"Failed to execute task {task.task_id}: {e}")
             task.fail(str(e))
+
+            # Keep overlay visible for failed tasks (show error state)
+            if self.overlay and self.overlay_task_id == task.task_id:
+                try:
+                    self.overlay.update_status(
+                        current_step=0,
+                        total_steps=7,
+                        step_description=f"❌ 任务失败: {str(e)[:30]}...",
+                        next_step_description="将在3秒后关闭"
+                    )
+                    time.sleep(3)  # Show error for 3 seconds
+                except Exception:
+                    pass
+
             # Move to completed immediately
             self.completed_tasks.append(self.current_task)
             self.current_task = None
+
+            # Hide overlay after showing error
+            self._hide_overlay()
+
             # Try to start next task
             self._start_next()
     
@@ -200,16 +253,50 @@ class TaskQueue:
                     
                     logger.info("=" * 60)
                 
+                # Update overlay for running AI task
+                if self.current_task and self.overlay and self.overlay_task_id == self.current_task.task_id:
+                    if hasattr(self.current_task, 'get_automation_progress'):
+                        try:
+                            prog = self.current_task.get_automation_progress()
+                            # Get step descriptions if available
+                            current_step = prog.get('current_step', 0)
+                            if hasattr(self.current_task, 'STEP_DESCRIPTIONS') and current_step in self.current_task.STEP_DESCRIPTIONS:
+                                current_desc, next_desc = self.current_task.STEP_DESCRIPTIONS[current_step]
+                                self.overlay.update_status(
+                                    current_step=current_step,
+                                    total_steps=prog.get('total_steps', 7),
+                                    step_description=current_desc,
+                                    next_step_description=next_desc
+                                )
+                        except Exception as e:
+                            logger.debug(f"Failed to update overlay: {e}")
+
                 # Check if current task completed
                 if self.current_task:
                     if self.current_task.check_completion():
                         logger.info(f"✅ Task {self.current_task.task_id} completed")
                         self.current_task.complete()
-                        
+
+                        # Show completion in overlay before hiding
+                        if self.overlay and self.overlay_task_id == self.current_task.task_id:
+                            try:
+                                self.overlay.update_status(
+                                    current_step=7,
+                                    total_steps=7,
+                                    step_description="✅ 任务完成!",
+                                    next_step_description="将在2秒后关闭"
+                                )
+                                time.sleep(2)  # Show completion for 2 seconds
+                            except Exception:
+                                pass
+
                         # Move to completed
                         self.completed_tasks.append(self.current_task)
                         self.current_task = None
-                        
+
+                        # Hide overlay after task completes
+                        self._hide_overlay()
+
                         # Start next task
                         self._start_next()
     
@@ -290,12 +377,47 @@ class TaskQueue:
             return None
     
     # ========================================================================
+    # OVERLAY MANAGEMENT
+    # ========================================================================
+
+    def _hide_overlay(self):
+        """Hide and cleanup overlay"""
+        if self.overlay and self.overlay_task_id:
+            try:
+                self.overlay.close()
+                self.overlay_task_id = None
+                logger.info("Overlay closed")
+            except Exception as e:
+                logger.warning(f"Failed to close overlay: {e}")
+
+    def _cancel_current_task(self):
+        """Cancel callback for ESC key press"""
+        with self.lock:
+            if self.current_task:
+                logger.warning(f"User cancelled task {self.current_task.task_id} via ESC key")
+                self.current_task.fail("User cancelled task")
+
+                # Move to completed
+                self.completed_tasks.append(self.current_task)
+                self.current_task = None
+
+                # Hide overlay
+                self._hide_overlay()
+
+                # Start next task
+                self._start_next()
+
+    # ========================================================================
     # CLEANUP
     # ========================================================================
-    
+
     def shutdown(self):
         """Stop monitoring thread and cleanup."""
         logger.info("TaskQueue shutting down")
         self.monitoring = False
+
+        # Close overlay if open
+        self._hide_overlay()
+
         if self.monitor_thread.is_alive():
             self.monitor_thread.join(timeout=2)

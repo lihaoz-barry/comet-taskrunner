@@ -146,16 +146,9 @@ class AITask(BaseTask):
         # Track automation completion (not just process)
         self.automation_completed = False
         
-        # Overlay system
+        # Overlay system - now managed by TaskQueue, not by individual tasks
+        # Keeping this for backwards compatibility but not initializing
         self.overlay = None
-        if OVERLAY_AVAILABLE:
-            try:
-                self.overlay = StatusOverlay()
-                self.overlay.set_cancel_callback(self._cancel_task)
-                logger.info("✓ Overlay system initialized")
-            except Exception as e:
-                logger.warning(f"Failed to initialize overlay: {e}")
-                self.overlay = None
         
         logger.info(f"AITask created with instruction: {instruction[:50]}...")
         logger.info(f"Template directory: {self.template_dir}")
@@ -169,12 +162,11 @@ class AITask(BaseTask):
             logger.info(f"✓ Template directory verified: {self.template_dir}")
     
     def _cancel_task(self):
-        """Cancel current automation task (ESC pressed)"""
+        """Cancel current automation task (ESC pressed) - Now handled by TaskQueue"""
         logger.warning("Task cancellation requested by user (ESC pressed)")
         self.automation_completed = True
         self.fail("User cancelled task")
-        if self.overlay:
-            self.overlay.close()
+        # Overlay closing is handled by TaskQueue
     
     def execute(self, comet_path: str) -> int:
         """
@@ -223,13 +215,9 @@ class AITask(BaseTask):
         logger.info(f"Instruction: {self.instruction}")
         logger.info("="*60)
         
-        # Show overlay at start
-        if self.overlay:
-            try:
-                self.overlay.show()
-                self._update_overlay_step(0)
-            except Exception as e:
-                logger.warning(f"Failed to show overlay: {e}")
+        # Overlay is now managed by TaskQueue, not here
+        # Just log that automation is starting
+        logger.info("Overlay management handled by TaskQueue")
         
         try:
             # Step 1: Wait for browser initialization
@@ -297,13 +285,8 @@ class AITask(BaseTask):
             self.automation_completed = True
         
         finally:
-            # Hide overlay when done
-            if self.overlay:
-                try:
-                    time.sleep(1)  # Brief pause to show completion
-                    self.overlay.close()
-                except Exception as e:
-                    logger.warning(f"Failed to close overlay: {e}")
+            # Overlay closing is handled by TaskQueue
+            pass
     
     # ========================================================================
     # OVERLAY INTEGRATION
