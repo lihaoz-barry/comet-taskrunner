@@ -58,6 +58,23 @@ a = Analysis(
         'tasks.base_task',
         'tasks.url_task',
         'tasks.ai_task',
+        'tasks.configurable_task',
+        # Workflow modules (our custom workflow system, not the third-party package)
+        'workflow',
+        'workflow.workflow_config',
+        'workflow.workflow_loader',
+        'workflow.step_executor',
+        'workflow.actions',
+        'workflow.actions.base_action',
+        'workflow.actions.window_action',
+        'workflow.actions.click_action',
+        'workflow.actions.click_and_type_action',
+        'workflow.actions.detect_action',
+        'workflow.actions.detect_loop_action',
+        'workflow.actions.key_press_action',
+        'workflow.actions.wait_action',
+        'workflow.actions.completion_action',
+        'workflow.actions.close_window_action',
         # Utility modules
         'utils',
         'utils.cleanup',
@@ -65,11 +82,22 @@ a = Analysis(
         'automation',
         'automation.window_manager',
         'automation.ai_automator',
+        'automation.pattern_matcher',
+        'automation.screenshot_capture',
+        'automation.mouse_controller',
     ],
-    hookspath=[],
+    hookspath=['pyinstaller_hooks'],  # Use our custom hooks to override problematic ones
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
+        # Exclude the third-party 'workflow' package to avoid hook conflicts
+        # (we have our own custom 'workflow' module in src/)
+        'Alfred-Workflow',
+        'workflow.background',
+        'workflow.notify',
+        'workflow.update',
+        'workflow.web',
+        'workflow.workflow',
         # Exclude unnecessary modules to reduce size
         # Note: tkinter is now INCLUDED for overlay system
         'matplotlib',
