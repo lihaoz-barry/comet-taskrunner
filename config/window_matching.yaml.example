@@ -1,0 +1,145 @@
+# Window Matching Configuration for Comet Browser
+# Copy this file to window_matching.yaml and customize for your setup
+
+comet_browser:
+  # === PRIMARY MATCHING CRITERIA (Most Reliable) ===
+
+  # Window class name (MOST RELIABLE - use tools/process_delta_detector.py to find this)
+  # Common values:
+  #   - "Chrome_WidgetWin_1" for Chromium-based browsers
+  #   - "MozillaWindowClass" for Firefox-based browsers
+  window_class: "Chrome_WidgetWin_1"  # TODO: Replace with actual class name
+
+  # Process executable name (case-insensitive)
+  # Run tools/process_delta_detector.py to identify the correct process name
+  process_name: "comet.exe"  # TODO: Verify this is correct
+
+  # === SECONDARY MATCHING CRITERIA (Fallback/Validation) ===
+
+  # Window title keywords (used for additional validation)
+  title_keywords:
+    - "Comet"
+    - "Perplexity"
+    # Add more keywords if needed
+
+  # Keywords to exclude (prevents matching wrong windows)
+  exclude_keywords:
+    - "TaskRunner Monitor"  # Our overlay window
+    - "python.exe"
+    - "cmd.exe"
+    - "powershell.exe"
+    - "Visual Studio Code"
+    - "backend.exe"
+    - ".py"
+    - "comet-taskrunner"
+    # Add more if you have other processes with "Comet" in the title
+
+  # === WINDOW SIZE CONSTRAINTS ===
+
+  # Minimum window dimensions (in pixels)
+  # Browser main windows are typically larger than dialogs/popups
+  min_width: 400
+  min_height: 300
+
+  # === VALIDATION STRATEGY ===
+
+  validation:
+    # Require window class to match (RECOMMENDED: true)
+    # Set to false only if class name is unreliable in your environment
+    require_class_match: true
+
+    # Require process name to match (RECOMMENDED: true)
+    # Set to false only for testing or if process name varies
+    require_process_match: true
+
+    # Require at least one title keyword to match (OPTIONAL)
+    # Set to true if you want strict title validation
+    # Set to false if browser title doesn't always contain keywords
+    require_title_keyword: false
+
+  # === SCORING WEIGHTS (for ranking multiple matches) ===
+
+  scoring:
+    # Base score for passing all validations
+    base_score: 100
+
+    # Bonus for each title keyword match
+    keyword_bonus: 20
+
+    # Bonus for large windows (>1000px wide)
+    large_width_bonus: 10
+
+    # Bonus for tall windows (>600px high)
+    large_height_bonus: 10
+
+    # Bonus for windows not at screen edge
+    position_bonus: 5
+
+  # === DEBUG OPTIONS ===
+
+  debug:
+    # Log all candidate windows (even rejected ones)
+    log_all_candidates: false
+
+    # Log reasons for rejecting windows
+    log_rejection_reasons: true
+
+    # Enable verbose window matching logs
+    verbose: false
+
+
+# === ADVANCED: Multiple Browser Profiles ===
+# You can define multiple configurations for different scenarios
+
+# Example: Development profile (more lenient matching)
+comet_browser_dev:
+  window_class: "Chrome_WidgetWin_1"
+  process_name: "comet.exe"
+  title_keywords:
+    - "Comet"
+  exclude_keywords:
+    - "TaskRunner"
+  validation:
+    require_class_match: true
+    require_process_match: false  # More lenient
+    require_title_keyword: false
+  min_width: 200
+  min_height: 200
+
+# Example: Production profile (strict matching)
+comet_browser_prod:
+  window_class: "Chrome_WidgetWin_1"
+  process_name: "comet.exe"
+  title_keywords:
+    - "Comet"
+    - "Perplexity"
+  exclude_keywords:
+    - "TaskRunner Monitor"
+    - "python"
+    - "cmd"
+  validation:
+    require_class_match: true
+    require_process_match: true
+    require_title_keyword: true  # Strict
+  min_width: 800
+  min_height: 600
+
+
+# === USAGE NOTES ===
+#
+# 1. Finding Window Class Name:
+#    Run: python tools/process_delta_detector.py
+#    Or:  python tools/debug_windows.py --filter Comet
+#
+# 2. Testing Configuration:
+#    Run: python tools/debug_windows.py --all
+#    Check that your settings match the browser window
+#
+# 3. Troubleshooting:
+#    - Enable debug.verbose: true to see detailed matching logs
+#    - Set validation flags to false one by one to find issues
+#    - Use tools/debug_windows.py to inspect window properties
+#
+# 4. Documentation:
+#    See docs/window_matching_strategies.md for detailed explanations
+#

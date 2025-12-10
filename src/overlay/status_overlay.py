@@ -67,7 +67,7 @@ class StatusOverlay:
             return
         
         self.root = tk.Tk()
-        self.root.title("COMET AUTOMATION")
+        self.root.title("TaskRunner Monitor")
         
         # Window properties
         self.root.overrideredirect(True)  # No borders
@@ -95,7 +95,7 @@ class StatusOverlay:
         # Title with emoji
         title_label = tk.Label(
             main_frame,
-            text="🤖 COMET AUTOMATION",
+            text="🤖 AI TASK MONITOR",
             font=('Arial', 14, 'bold'),
             bg=bg_color,
             fg='#00ff88'
