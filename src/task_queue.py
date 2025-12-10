@@ -121,8 +121,8 @@ class TaskQueue:
         """
         self.current_task = task
 
-        # Show overlay for AI tasks
-        if self.overlay and task.task_type == TaskType.AI_ASSISTANT:
+        # Show overlay for AI tasks or tasks that support it
+        if self.overlay and (task.task_type == TaskType.AI_ASSISTANT or hasattr(task, 'get_automation_progress')):
             try:
                 self.overlay_task_id = task.task_id
                 self.overlay.show()
@@ -253,7 +253,7 @@ class TaskQueue:
                     
                     logger.info("=" * 60)
                 
-                # Update overlay for running AI task
+                # Update overlay for running AI task (or compatible task)
                 if self.current_task and self.overlay and self.overlay_task_id == self.current_task.task_id:
                     if hasattr(self.current_task, 'get_automation_progress'):
                         try:

@@ -104,3 +104,39 @@ class ConfigurableTask(BaseTask):
                 'inputs': self.inputs
             }
         }
+
+    def get_automation_progress(self) -> Dict[str, Any]:
+        """
+        Get progress in format expected by StatusOverlay.
+        """
+        return {
+            'current_step': self.current_step_index,
+            'total_steps': self.total_steps,
+            'completed_steps': len(self.step_results),
+            'progress_percent': int((len(self.step_results) / self.total_steps) * 100) if self.total_steps > 0 else 0
+        }
+
+    @property
+    def STEP_DESCRIPTIONS(self) -> Dict[int, tuple]:
+        """
+        Generate step descriptions for the overlay from workflow config.
+        Returns map of step_index -> (current_desc, next_desc)
+        """
+        descriptions = {}
+        steps = self.workflow_config.steps
+        
+        for i, step in enumerate(steps):
+            step_num = i + 1
+            # Current step description
+            current = step.display_name or step.name
+            
+            # Next step description
+            if i + 1 < len(steps):
+                next_step = steps[i+1]
+                next_desc = next_step.display_name or next_step.name
+            else:
+                next_desc = "完成"
+                
+            descriptions[step_num] = (current, next_desc)
+            
+        return descriptions
