@@ -21,6 +21,8 @@ a = Analysis(
     datas=[
         # Include templates directory for AI automation
         ('templates', 'templates'),
+        # Include config directory for window matching configuration
+        ('config', 'config'),
         # Include screenshots directory (create if doesn't exist)
     ],
     hiddenimports=[
@@ -38,6 +40,7 @@ a = Analysis(
         'mss',
         'pyautogui',
         'PIL',  # Pillow
+        'yaml',  # PyYAML for config loading
         # Tkinter for overlay system
         'tkinter',
         'tkinter.ttk',

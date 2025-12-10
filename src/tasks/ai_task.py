@@ -142,14 +142,17 @@ class AITask(BaseTask):
         
         self.screenshot_dir.mkdir(exist_ok=True)
         
+        # Window Manager - NEW: Config-driven multi-layer validation
+        self.window_manager = WindowManager()  # Uses default config path
+
         # Automation state
         self.hwnd = None
         self.window_rect = None
         self.step_results = []
-        
+
         # Track automation completion (not just process)
         self.automation_completed = False
-        
+
         # Overlay system - now managed by TaskQueue, not by individual tasks
         # Keeping this for backwards compatibility but not initializing
         self.overlay = None
@@ -359,23 +362,11 @@ class AITask(BaseTask):
         logger.info("[STEP 2/9] Activating Comet window...")
         
         try:
-            # Find window - with filtering to exclude frontend
-            logger.info("  → Searching for Comet browser window (excluding frontend)...")
-            
-            # Use more specific keywords to find actual browser, not frontend
-            result = WindowManager.find_comet_window(keywords=["New Tab - Comet", "Comet"])
-            
-            # If found, verify it's not the frontend
-            if result:
-                hwnd, rect = result
-                import win32gui
-                window_title = win32gui.GetWindowText(hwnd)
-                
-                # Exclude frontend window
-                if "Task Runner" in window_title:
-                    logger.warning(f"  ⚠ Found frontend window, searching for browser window...")
-                    # Try again without generic "Comet" keyword
-                    result = WindowManager.find_comet_window(keywords=["New Tab"])
+            # Find window - NEW: Using config-driven multi-layer validation
+            logger.info("  → Searching for Comet browser window (multi-layer validation)...")
+
+            # Use new WindowManager instance method (config-driven)
+            result = self.window_manager.find_comet_window()
             
             if not result:
                 error = "Comet browser windownot found (may still be loading)"
@@ -653,7 +644,7 @@ class AITask(BaseTask):
             # Check if window still exists
             if not self.hwnd or not win32gui.IsWindow(self.hwnd):
                 logger.warning("  ⚠ Window handle invalid, searching for window again...")
-                result = WindowManager.find_comet_window(keywords=["New Tab - Comet", "Comet"])
+                result = self.window_manager.find_comet_window()
                 if not result:
                     logger.error("  ✗ Could not find Comet window")
                     return False
