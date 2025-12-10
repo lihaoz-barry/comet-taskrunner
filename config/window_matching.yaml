@@ -1,0 +1,91 @@
+# Window Matching Configuration for Comet Browser
+# This file configures the multi-layer validation strategy for finding Comet browser windows
+
+comet_browser:
+  # ========================================================================
+  # PRIMARY MATCHING CRITERIA (Most Reliable)
+  # ========================================================================
+
+  # Window class name - THE MOST RELIABLE identifier
+  # TODO: Run "python tools/process_delta_detector.py" to find the actual class name
+  # Common values for Chromium-based browsers: "Chrome_WidgetWin_1"
+  window_class: "Chrome_WidgetWin_1"
+
+  # Process executable name (case-insensitive matching)
+  # This will match both "Comet.exe" and "comet.exe"
+  process_name: "comet.exe"
+
+  # NEW: Process path must contain this substring (case-insensitive)
+  # This ensures the process executable path contains "comet.exe"
+  # Example: "C:\Program Files\Comet\Comet.exe" contains "comet.exe" ✓
+  process_path_contains: "comet.exe"
+
+  # ========================================================================
+  # SECONDARY MATCHING CRITERIA (Fallback/Validation)
+  # ========================================================================
+
+  # Window title keywords for additional validation
+  title_keywords:
+    - "Comet"
+    - "Perplexity"
+
+  # Keywords to exclude (prevents matching wrong windows)
+  exclude_keywords:
+    - "TaskRunner Monitor"  # Our overlay window (already renamed)
+    - "AI TASK MONITOR"     # Our overlay display text
+    - "python.exe"
+    - "cmd.exe"
+    - "powershell.exe"
+    - "Visual Studio Code"
+    - "backend.exe"
+    - ".py"
+    - "comet-taskrunner"
+    - "PyCharm"
+    - "Cursor"
+
+  # ========================================================================
+  # WINDOW SIZE CONSTRAINTS
+  # ========================================================================
+
+  # Minimum window dimensions (in pixels)
+  # Browser main windows are typically larger than dialogs/popups
+  min_width: 400
+  min_height: 300
+
+  # ========================================================================
+  # VALIDATION STRATEGY
+  # ========================================================================
+
+  validation:
+    # Require window class to match (HIGHLY RECOMMENDED)
+    require_class_match: true
+
+    # Require process name to match (HIGHLY RECOMMENDED)
+    require_process_match: true
+
+    # NEW: Require process path to contain specified substring
+    require_process_path_match: true
+
+    # Require at least one title keyword to match (OPTIONAL)
+    # Set to false for more lenient matching
+    require_title_keyword: false
+
+  # ========================================================================
+  # SCORING WEIGHTS (for ranking multiple matches)
+  # ========================================================================
+
+  scoring:
+    base_score: 100          # Base score for passing all validations
+    keyword_bonus: 20        # Bonus for each title keyword match
+    large_width_bonus: 10    # Bonus for windows wider than 1000px
+    large_height_bonus: 10   # Bonus for windows taller than 600px
+    position_bonus: 5        # Bonus for windows not at screen edge
+
+  # ========================================================================
+  # DEBUG OPTIONS
+  # ========================================================================
+
+  debug:
+    log_all_candidates: false      # Log all candidate windows (even rejected)
+    log_rejection_reasons: true    # Log reasons for rejecting windows
+    verbose: false                 # Enable verbose matching logs

@@ -30,6 +30,17 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from automation import WindowManager, ScreenshotCapture, PatternMatcher, MouseController
 
+# Import overlay modules
+try:
+    from overlay import StatusOverlay, OverlayConfig
+    OVERLAY_AVAILABLE = True
+except ImportError as e:
+    OVERLAY_AVAILABLE = False
+    # Log the specific import error for debugging
+    logging.warning(f"Overlay module not available: {e}")
+    logging.warning(f"Python path: {sys.path}")
+    logging.warning("Tkinter overlay features will be disabled")
+
 logger = logging.getLogger(__name__)
 
 
@@ -83,6 +94,17 @@ class AITask(BaseTask):
         'stop_logo': 0.7,  # Higher threshold for accurate stop detection
     }
     
+    # Step descriptions for overlay
+    STEP_DESCRIPTIONS = {
+        1: ("等待浏览器初始化", "激活窗口"),
+        2: ("激活Comet窗口", "查找Assistant按钮"),
+        3: ("查找Assistant按钮", "点击Assistant按钮"),
+        4: ("点击Assistant按钮", "查找输入框"),
+        5: ("查找输入框", "输入指令文字"),
+        6: ("输入指令文字", "发送指令"),
+        7: ("发送指令", "完成"),
+    }
+    
     def __init__(self, instruction: str, template_dir: str = None):
         """
         Create AI automation task.
@@ -120,13 +142,20 @@ class AITask(BaseTask):
         
         self.screenshot_dir.mkdir(exist_ok=True)
         
+        # Window Manager - NEW: Config-driven multi-layer validation
+        self.window_manager = WindowManager()  # Uses default config path
+
         # Automation state
         self.hwnd = None
         self.window_rect = None
         self.step_results = []
-        
+
         # Track automation completion (not just process)
         self.automation_completed = False
+
+        # Overlay system - now managed by TaskQueue, not by individual tasks
+        # Keeping this for backwards compatibility but not initializing
+        self.overlay = None
         
         logger.info(f"AITask created with instruction: {instruction[:50]}...")
         logger.info(f"Template directory: {self.template_dir}")
@@ -138,6 +167,13 @@ class AITask(BaseTask):
             logger.error("Please ensure templates folder is in the correct location")
         else:
             logger.info(f"✓ Template directory verified: {self.template_dir}")
+    
+    def _cancel_task(self):
+        """Cancel current automation task (ESC pressed) - Now handled by TaskQueue"""
+        logger.warning("Task cancellation requested by user (ESC pressed)")
+        self.automation_completed = True
+        self.fail("User cancelled task")
+        # Overlay closing is handled by TaskQueue
     
     def execute(self, comet_path: str) -> int:
         """
@@ -186,17 +222,24 @@ class AITask(BaseTask):
         logger.info(f"Instruction: {self.instruction}")
         logger.info("="*60)
         
+        # Overlay is now managed by TaskQueue, not here
+        # Just log that automation is starting
+        logger.info("Overlay management handled by TaskQueue")
+        
         try:
             # Step 1: Wait for browser initialization
+            self._update_overlay_step(1)
             self._step_1_wait_for_initialization()
             
             # Step 2: Activate window
+            self._update_overlay_step(2)
             result = self._step_2_activate_window()
             if not result.success:
                 self.fail(f"Step 2 failed: {result.error}")
                 return
             
             # Step 3: Find Assistant button
+            self._update_overlay_step(3)
             result = self._step_3_find_assistant()
             if not result.success:
                 self.fail(f"Step 3 failed: {result.error}")
@@ -204,12 +247,14 @@ class AITask(BaseTask):
             assistant_coords = result.data['coordinates']
             
             # Step 4: Click Assistant button
+            self._update_overlay_step(4)
             result = self._step_4_click_assistant(assistant_coords)
             if not result.success:
                 self.fail(f"Step 4 failed: {result.error}")
                 return
             
             # Step 5: Find input box
+            self._update_overlay_step(5)
             result = self._step_5_find_input_box()
             if not result.success:
                 self.fail(f"Step 5 failed: {result.error}")
@@ -217,12 +262,14 @@ class AITask(BaseTask):
             input_coords = result.data['coordinates']
             
             # Step 6: Input text
+            self._update_overlay_step(6)
             result = self._step_6_input_text(input_coords)
             if not result.success:
                 self.fail(f"Step 6 failed: {result.error}")
                 return
             
             # Step 7: Send instruction
+            self._update_overlay_step(7)
             result = self._step_7_send()
             if not result.success:
                 self.fail(f"Step 7 failed: {result.error}")
@@ -255,6 +302,42 @@ class AITask(BaseTask):
             self.fail(error_msg)
             # Mark automation as completed (even if failed)
             self.automation_completed = True
+        
+        finally:
+            # Overlay closing is handled by TaskQueue
+            pass
+    
+    # ========================================================================
+    # OVERLAY INTEGRATION
+    # ========================================================================
+    
+    def _update_overlay_step(self, step_number: int):
+        """
+        Update overlay with current step information.
+        
+        Args:
+            step_number: Current step number (0-7)
+        """
+        if not self.overlay:
+            return
+        
+        try:
+            # Get step descriptions
+            if step_number in self.STEP_DESCRIPTIONS:
+                current_desc, next_desc = self.STEP_DESCRIPTIONS[step_number]
+            else:
+                current_desc = "准备开始..."
+                next_desc = "等待浏览器初始化"
+            
+            # Update overlay
+            self.overlay.update_status(
+                current_step=step_number,
+                total_steps=7,
+                step_description=current_desc,
+                next_step_description=next_desc
+            )
+        except Exception as e:
+            logger.warning(f"Failed to update overlay: {e}")
     
     # ========================================================================
     # AUTOMATION STEPS
@@ -279,23 +362,11 @@ class AITask(BaseTask):
         logger.info("[STEP 2/9] Activating Comet window...")
         
         try:
-            # Find window - with filtering to exclude frontend
-            logger.info("  → Searching for Comet browser window (excluding frontend)...")
-            
-            # Use more specific keywords to find actual browser, not frontend
-            result = WindowManager.find_comet_window(keywords=["New Tab - Comet", "Comet"])
-            
-            # If found, verify it's not the frontend
-            if result:
-                hwnd, rect = result
-                import win32gui
-                window_title = win32gui.GetWindowText(hwnd)
-                
-                # Exclude frontend window
-                if "Task Runner" in window_title:
-                    logger.warning(f"  ⚠ Found frontend window, searching for browser window...")
-                    # Try again without generic "Comet" keyword
-                    result = WindowManager.find_comet_window(keywords=["New Tab"])
+            # Find window - NEW: Using config-driven multi-layer validation
+            logger.info("  → Searching for Comet browser window (multi-layer validation)...")
+
+            # Use new WindowManager instance method (config-driven)
+            result = self.window_manager.find_comet_window()
             
             if not result:
                 error = "Comet browser windownot found (may still be loading)"
@@ -573,7 +644,7 @@ class AITask(BaseTask):
             # Check if window still exists
             if not self.hwnd or not win32gui.IsWindow(self.hwnd):
                 logger.warning("  ⚠ Window handle invalid, searching for window again...")
-                result = WindowManager.find_comet_window(keywords=["New Tab - Comet", "Comet"])
+                result = self.window_manager.find_comet_window()
                 if not result:
                     logger.error("  ✗ Could not find Comet window")
                     return False

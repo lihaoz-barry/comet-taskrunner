@@ -525,22 +525,33 @@ def get_all_jobs():
 def start_task_monitor():
     """
     Background thread to periodically check task completion.
-    
+
     Runs every 5 seconds and calls task_manager.monitor_tasks()
     which checks all RUNNING tasks using their completion logic.
-    
+
     This is especially important for AI tasks that need periodic
     screenshot analysis (placeholder).
     """
     def monitor_loop():
         logger.info("Task monitor thread started")
+        iteration = 0
         while True:
             try:
+                iteration += 1
+                logger.debug(f"Monitor iteration {iteration}: Checking tasks...")
                 task_manager.monitor_tasks()
+
+                # Log status every 10 iterations (50 seconds)
+                if iteration % 10 == 0:
+                    all_tasks = task_manager.get_all_tasks()
+                    running_count = len([t for t in all_tasks.values() if t.get('status') == 'running'])
+                    logger.info(f"Monitor status: {running_count} running task(s), {len(all_tasks)} total task(s)")
             except Exception as e:
                 logger.error(f"Error in monitor loop: {e}")
+                import traceback
+                traceback.print_exc()
             time.sleep(5)  # Check every 5 seconds
-    
+
     monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
     monitor_thread.start()
 
@@ -552,13 +563,31 @@ def start_task_monitor():
 if __name__ == '__main__':
     import atexit
     from utils.cleanup import cleanup_temp_files
-    
+
     # Register cleanup on normal exit
     atexit.register(cleanup_temp_files)
-    
+
     logger.info("=" * 60)
     logger.info("Starting Comet Task Runner Backend")
     logger.info("=" * 60)
+
+    # Check overlay module availability
+    logger.info("Checking overlay module availability...")
+    try:
+        from overlay import StatusOverlay, OverlayConfig
+        logger.info("✓ Overlay module loaded successfully")
+        logger.info("  - StatusOverlay available")
+        logger.info("  - OverlayConfig available")
+    except ImportError as e:
+        logger.warning(f"⚠ Overlay module not available: {e}")
+        logger.warning("  Tkinter overlay features will be disabled")
+
+    # Check keyboard module availability
+    try:
+        import keyboard
+        logger.info("✓ Keyboard module available for ESC cancellation")
+    except ImportError:
+        logger.warning("⚠ Keyboard module not available - ESC cancellation disabled")
     
     # Security Check: Ensure API Key is set before exposing to 0.0.0.0
     api_key = os.environ.get('COMET_API_KEY')

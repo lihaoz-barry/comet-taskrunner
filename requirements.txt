@@ -8,4 +8,7 @@ mss>=9.0.0
 pyautogui>=0.9.50
 Pillow>=10.0.0
 pywin32>=305
+# Optional overlay dependencies (graceful degradation if unavailable)
+pystray>=0.19.0
+keyboard>=0.13.0
 PyYAML>=6.0
