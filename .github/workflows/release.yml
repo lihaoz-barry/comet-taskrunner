@@ -25,7 +25,13 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          if (Test-Path "requirements.txt") {
+              Write-Host "Installing dependencies from requirements.txt..."
+              pip install -r requirements.txt
+          } else {
+              Write-Host "WARNING: requirements.txt not found"
+              exit 1
+          }
           pip install pyinstaller
 
       - name: Read version from version.txt
@@ -42,6 +48,12 @@ jobs:
           $ErrorActionPreference = "Stop"
           
           Write-Host "Starting build process..."
+          
+          # Verify backend.spec exists
+          if (-not (Test-Path "backend.spec")) {
+              Write-Host "ERROR: backend.spec not found"
+              exit 1
+          }
           
           # Remove old build if exists
           if (Test-Path "dist\backend.exe") {
@@ -107,8 +119,7 @@ jobs:
           Write-Host "Changelog generated:"
           Get-Content "changelog.txt"
           
-          # Set output for release notes (escape for multiline)
-          $changelogEscaped = $changelog -replace "`r`n", "%0A" -replace "`n", "%0A"
+          # Set output for release notes (multiline heredoc format)
           echo "CHANGELOG<<EOF" >> $env:GITHUB_OUTPUT
           echo "$changelog" >> $env:GITHUB_OUTPUT
           echo "EOF" >> $env:GITHUB_OUTPUT
