@@ -140,3 +140,18 @@ class ConfigurableTask(BaseTask):
             descriptions[step_num] = (current, next_desc)
             
         return descriptions
+
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Serialize task to dictionary.
+
+        Adds workflow-specific fields including inputs.
+        """
+        data = super().to_dict()
+        data['workflow_name'] = self.workflow_config.name
+        data['inputs'] = self.inputs
+        # Add instruction field for backward compatibility with frontend
+        # (frontend expects 'instruction' for AI tasks)
+        if 'instruction' in self.inputs:
+            data['instruction'] = self.inputs['instruction']
+        return data
