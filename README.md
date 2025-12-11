@@ -22,6 +22,16 @@ A Python-based automation tool for Comet Browser with support for URL navigation
 
 ## Installation
 
+### Option 1: Download Pre-built Executable (Recommended)
+
+**No Python installation required!**
+
+1. Go to the [Releases page](https://github.com/lihaoz-barry/comet-taskrunner/releases)
+2. Download the latest `backend-x.x.x.exe` file
+3. Run the executable directly - the backend server will start automatically
+
+### Option 2: Install from Source
+
 1.  Open a terminal in this folder.
 2.  Install dependencies:
     ```bash
@@ -226,6 +236,39 @@ For detailed documentation, see the `docs/` directory:
 - [ ] Coordinate calibration tool
 - [ ] Task scheduling and queuing
 - [ ] Task history and analytics
+
+## 🚀 Release Automation
+
+This repository uses GitHub Actions to automatically build and release the backend executable.
+
+### How It Works
+
+1. **Automatic Builds**: When code is merged to the `min` branch, GitHub Actions automatically:
+   - Builds the backend using `build_backend.bat`
+   - Reads version number from `version.txt`
+   - Generates changelog from recent git commits
+   - Creates a new GitHub Release
+   - Uploads the compiled `backend.exe` to the release
+
+2. **Version Management**: 
+   - Update the version number in `version.txt` before merging to `min`
+   - The release tag will be automatically created as `v{version}`
+
+3. **Downloading Releases**:
+   - Visit the [Releases page](https://github.com/lihaoz-barry/comet-taskrunner/releases)
+   - Download the latest `backend-{version}.exe` or `backend.exe`
+   - No installation needed - just run the executable
+
+4. **Changelog**: Each release includes an automatically generated changelog showing all commits since the last release
+
+### For Maintainers
+
+To create a new release:
+1. Update `version.txt` with the new version number (e.g., `0.2.0`)
+2. Commit and push changes to the `min` branch
+3. GitHub Actions will automatically build and create the release
+4. Check the Actions tab to monitor the build progress
+5. The new release will appear on the Releases page once complete
 
 ## Contributing
 

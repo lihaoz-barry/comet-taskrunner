@@ -1,0 +1,160 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [ min ]
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for changelog generation
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Read version from version.txt
+        id: version
+        run: |
+          $version = Get-Content version.txt -Raw
+          $version = $version.Trim()
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          echo "Version: $version"
+
+      - name: Build backend.exe with build_backend.bat
+        run: |
+          # Run the build script non-interactively
+          $ErrorActionPreference = "Stop"
+          
+          Write-Host "Starting build process..."
+          
+          # Remove old build if exists
+          if (Test-Path "dist\backend.exe") {
+              Remove-Item "dist\backend.exe" -Force
+              Write-Host "Removed old backend.exe"
+          }
+          
+          # Run PyInstaller with spec file
+          pyinstaller backend.spec
+          
+          if (-not (Test-Path "dist\backend.exe")) {
+              Write-Host "ERROR: Build failed - backend.exe not found"
+              exit 1
+          }
+          
+          Write-Host "Build successful!"
+          $fileSize = (Get-Item "dist\backend.exe").Length / 1MB
+          Write-Host "File size: $([math]::Round($fileSize, 2)) MB"
+
+      - name: Verify build output
+        run: |
+          if (Test-Path "dist\backend.exe") {
+            Write-Host "✓ Build successful: dist\backend.exe"
+            $fileSize = (Get-Item "dist\backend.exe").Length / 1MB
+            Write-Host "  File size: $([math]::Round($fileSize, 2)) MB"
+          } else {
+            Write-Host "✗ Build failed: dist\backend.exe not found"
+            exit 1
+          }
+
+      - name: Rename exe to include version
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          Copy-Item "dist\backend.exe" "dist\backend-$version.exe"
+          Write-Host "Created: dist\backend-$version.exe"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          
+          # Get the latest tag
+          $latestTag = git describe --tags --abbrev=0 2>$null
+          
+          if ($latestTag) {
+              Write-Host "Latest tag: $latestTag"
+              $commitRange = "$latestTag..HEAD"
+          } else {
+              Write-Host "No previous tags found, using all commits"
+              $commitRange = "HEAD"
+          }
+          
+          # Generate changelog
+          $changelog = git log $commitRange --pretty=format:"- %s (%h)" --no-merges
+          
+          if (-not $changelog) {
+              $changelog = "- Initial release"
+          }
+          
+          # Save changelog to file
+          $changelog | Out-File -FilePath "changelog.txt" -Encoding UTF8
+          
+          Write-Host "Changelog generated:"
+          Get-Content "changelog.txt"
+          
+          # Set output for release notes (escape for multiline)
+          $changelogEscaped = $changelog -replace "`r`n", "%0A" -replace "`n", "%0A"
+          echo "CHANGELOG<<EOF" >> $env:GITHUB_OUTPUT
+          echo "$changelog" >> $env:GITHUB_OUTPUT
+          echo "EOF" >> $env:GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.VERSION }}
+          name: Release v${{ steps.version.outputs.VERSION }}
+          body: |
+            ## Comet Task Runner v${{ steps.version.outputs.VERSION }}
+            
+            ### 📦 Download
+            
+            Download the standalone executable below. No Python installation required!
+            
+            ### 📝 Changelog
+            
+            ${{ steps.changelog.outputs.CHANGELOG }}
+            
+            ### 📋 Installation
+            
+            1. Download `backend-${{ steps.version.outputs.VERSION }}.exe`
+            2. Run the executable directly - no installation needed
+            3. The backend server will start on `http://127.0.0.1:5000`
+            
+            ### 🔒 Security Note
+            
+            If running on a network (not localhost), set the `COMET_API_KEY` environment variable for authentication.
+            
+            ---
+            *Built automatically by GitHub Actions from the min branch*
+          files: |
+            dist/backend-${{ steps.version.outputs.VERSION }}.exe
+            dist/backend.exe
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-exe-v${{ steps.version.outputs.VERSION }}
+          path: |
+            dist/backend.exe
+            dist/backend-${{ steps.version.outputs.VERSION }}.exe
+            changelog.txt
+          retention-days: 90
