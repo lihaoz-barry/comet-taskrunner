@@ -2,7 +2,7 @@ name: Build & Release
 
 on:
   push:
-    branches: [ min ]
+    branches: [ main ]
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
