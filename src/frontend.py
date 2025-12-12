@@ -468,22 +468,32 @@ class CometRunnerApp:
         """Render a single task item in the status widget."""
         # Get task info
         task_type = task.get('task_type', 'unknown')
-        
-        # For AI tasks, show prompt (truncated)
-        if task_type == "ai":
-            prompt = task.get('instruction', 'Unknown')
+
+        # For AI tasks and ConfigurableTask (custom), show prompt/instruction
+        if task_type == "ai" or task_type == "custom":
+            # Try to get instruction field
+            prompt = task.get('instruction', None)
+
+            # If no instruction, try to get from inputs (for ConfigurableTask)
+            if not prompt:
+                inputs = task.get('inputs', {})
+                prompt = inputs.get('instruction', 'Unknown')
+
             # Truncate long prompts
             if len(prompt) > 30:
                 display_text = prompt[:27] + "..."
             else:
                 display_text = prompt
-        else:
+        elif task_type == "url":
             # For URL tasks, show URL
             url = task.get('url', 'Unknown')
             if len(url) > 30:
                 display_text = url[:27] + "..."
             else:
                 display_text = url
+        else:
+            # Unknown task type - show generic info
+            display_text = f"Task ({task_type})"
         
         # Determine status and colors
         if is_current:
