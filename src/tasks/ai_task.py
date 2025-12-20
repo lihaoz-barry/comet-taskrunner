@@ -25,6 +25,16 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 from .base_task import BaseTask, TaskType, TaskResult
 
+# Windows-specific imports for window management
+try:
+    import win32gui
+    import win32con
+    import win32api
+    import win32process
+    HAS_WIN32 = True
+except ImportError:
+    HAS_WIN32 = False
+
 # Import automation modules
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -362,6 +372,13 @@ class AITask(BaseTask):
         logger.info("[STEP 2/9] Activating Comet window...")
         
         try:
+            if not HAS_WIN32:
+                error = "Windows libraries (win32gui) not available"
+                logger.error(f"  ✗ {error}")
+                step_result = StepResult("activate_window", False, error=error)
+                self.step_results.append(step_result)
+                return step_result
+
             # Find window - NEW: Using config-driven multi-layer validation
             logger.info("  → Searching for Comet browser window (multi-layer validation)...")
 
@@ -637,9 +654,11 @@ class AITask(BaseTask):
         Returns:
             bool: True if window found and position updated
         """
+        if not HAS_WIN32:
+            logger.error("  ✗ win32 libraries not available")
+            return False
+            
         try:
-            import win32gui
-            import win32con
             
             # Check if window still exists
             if not self.hwnd or not win32gui.IsWindow(self.hwnd):
