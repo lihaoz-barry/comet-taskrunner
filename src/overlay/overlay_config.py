@@ -25,9 +25,9 @@ class OverlayConfig:
     """Configuration manager for overlay settings"""
     
     DEFAULT_CONFIG = {
-        'position': OverlayPosition.TOP_RIGHT.value,
+        'position': OverlayPosition.BOTTOM_LEFT.value,
         'visible': True,
-        'opacity': 0.85,
+        'opacity': 0.7,
         'width': 300,
         'height': 280,
         'margin': 20,
