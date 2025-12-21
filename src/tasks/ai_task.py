@@ -25,6 +25,16 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 from .base_task import BaseTask, TaskType, TaskResult
 
+# Windows-specific imports for window management
+try:
+    import win32gui
+    import win32con
+    import win32api
+    import win32process
+    HAS_WIN32 = True
+except ImportError:
+    HAS_WIN32 = False
+
 # Import automation modules
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -125,10 +135,14 @@ class AITask(BaseTask):
                 # Running as PyInstaller exe - use _MEIPASS
                 base_path = Path(sys._MEIPASS)
                 self.template_dir = base_path / "templates"
-                logger.info(f"Running as packaged exe, using _MEIPASS: {base_path}")
             else:
                 # Running in development mode - use relative path
                 self.template_dir = Path(__file__).parent.parent.parent / "templates"
+        
+        # Check for 'ai' subdirectory (preferred structure)
+        if (self.template_dir / "ai").exists():
+            self.template_dir = self.template_dir / "ai"
+            logger.info(f"Using 'ai' subdirectory for templates: {self.template_dir}")
         
         # Screenshot directory - always use current working directory
         # (not inside temp directory for PyInstaller)
@@ -362,6 +376,13 @@ class AITask(BaseTask):
         logger.info("[STEP 2/9] Activating Comet window...")
         
         try:
+            if not HAS_WIN32:
+                error = "Windows libraries (win32gui) not available"
+                logger.error(f"  ✗ {error}")
+                step_result = StepResult("activate_window", False, error=error)
+                self.step_results.append(step_result)
+                return step_result
+
             # Find window - NEW: Using config-driven multi-layer validation
             logger.info("  → Searching for Comet browser window (multi-layer validation)...")
 
@@ -404,52 +425,66 @@ class AITask(BaseTask):
             return step_result
     
     def _step_3_find_assistant(self) -> StepResult:
-        """Step 3: Find Assistant button using template matching"""
+        """Step 3: Find Assistant button using template matching (with retries)"""
         logger.info("")
         logger.info("[STEP 3/9] Finding Assistant button...")
         
+        max_attempts = 10
+        retry_delay = 1.0
+        
         try:
-            # Refresh window position before screenshot
-            if not self._refresh_window_position():
-                return StepResult("find_assistant", False, 
-                                error="Window position refresh failed")
+            for attempt in range(max_attempts):
+                if attempt > 0:
+                    logger.info(f"  ↻ Retry attempt {attempt + 1}/{max_attempts}...")
+                
+                # Refresh window position before screenshot
+                if not self._refresh_window_position():
+                    logger.warning("  ⚠ Window position refresh failed, retrying...")
+                    time.sleep(retry_delay)
+                    continue
+                
+                # Take screenshot
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                screenshot_path = self.screenshot_dir / f"assistant_button_{timestamp}.png"
+                
+                logger.info("  → Taking screenshot...")
+                screenshot = ScreenshotCapture.capture_window(self.window_rect, str(screenshot_path))
+                
+                # Template matching
+                template_path = self.template_dir / self.TEMPLATES['assistant_button']
+                threshold = self.THRESHOLDS['assistant_button']
+                
+                logger.info(f"  → Matching template: {template_path.name} (threshold={threshold})")
+                
+                coordinates = PatternMatcher.find_pattern(
+                    str(screenshot_path),
+                    str(template_path),
+                    self.window_rect,
+                    threshold
+                )
+                
+                if coordinates:
+                    logger.info(f"  ✓ Assistant button found at: {coordinates}")
+                    step_result = StepResult("find_assistant", True,
+                                          data={'coordinates': coordinates, 'confidence': 'matched'})
+                    self.step_results.append(step_result)
+                    return step_result
+                
+                # No match, wait and retry
+                time.sleep(retry_delay)
             
-            # Take screenshot
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            screenshot_path = self.screenshot_dir / f"assistant_button_{timestamp}.png"
-            
-            logger.info("  → Taking screenshot...")
-            screenshot = ScreenshotCapture.capture_window(self.window_rect, str(screenshot_path))
-            logger.info(f"  ✓ Screenshot saved: {screenshot_path.name}")
-            
-            # Template matching
-            template_path = self.template_dir / self.TEMPLATES['assistant_button']
-            threshold = self.THRESHOLDS['assistant_button']
-            
-            logger.info(f"  → Matching template: {template_path.name} (threshold={threshold})")
-            
-            coordinates = PatternMatcher.find_pattern(
-                str(screenshot_path),
-                str(template_path),
-                self.window_rect,
-                threshold
-            )
-            
-            if coordinates:
-                logger.info(f"  ✓ Assistant button found at: {coordinates}")
-                step_result = StepResult("find_assistant", True,
-                                      data={'coordinates': coordinates, 'confidence': 'matched'})
-            else:
-                error = "Assistant button not found in screenshot"
-                logger.error(f"  ✗ {error}")
-                step_result = StepResult("find_assistant", False, error=error)
-            
+            # If we reach here, all attempts failed
+            error = f"Assistant button not found after {max_attempts} attempts"
+            logger.error(f"  ✗ {error}")
+            step_result = StepResult("find_assistant", False, error=error)
             self.step_results.append(step_result)
             return step_result
             
         except Exception as e:
             error = f"Assistant button detection error: {e}"
             logger.error(f"  ✗ {error}")
+            import traceback
+            traceback.print_exc()
             step_result = StepResult("find_assistant", False, error=error)
             self.step_results.append(step_result)
             return step_result
@@ -485,69 +520,69 @@ class AITask(BaseTask):
             return step_result
     
     def _step_5_find_input_box(self) -> StepResult:
-        """Step 5: Find input box using template matching"""
+        """Step 5: Find input box using template matching (with retries)"""
         logger.info("")
         logger.info("[STEP 5/9] Finding input box...")
         
+        max_attempts = 10
+        retry_delay = 1.0
+        
         try:
-            # Refresh window position before screenshot
-            if not self._refresh_window_position():
-                return StepResult("find_input_box", False,
-                                error="Window position refresh failed")
-            
-            # Take new screenshot (UI has changed after clicking Assistant)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            screenshot_path = self.screenshot_dir / f"input_box_{timestamp}.png"
-            
-            logger.info("  → Taking screenshot...")
-            time.sleep(0.5)  # Wait for UI to settle
-            screenshot = ScreenshotCapture.capture_window(self.window_rect, str(screenshot_path))
-            logger.info(f"  ✓ Screenshot saved: {screenshot_path.name}")
-            
-            # Template matching
-            template_path = self.template_dir / self.TEMPLATES['input_box']
-            
-            # Check if template exists
-            if not template_path.exists():
-                logger.warning(f"  ⚠ Template not found: {template_path}")
-                logger.warning("  ⚠ Skipping input box detection, using click position")
-                # Fallback: click at center of window
-                left, top, right, bottom = self.window_rect
-                center_x = (left + right) // 2
-                center_y = (top + bottom) // 2
-                coordinates = (center_x, center_y)
+            for attempt in range(max_attempts):
+                if attempt > 0:
+                    logger.info(f"  ↻ Retry attempt {attempt + 1}/{max_attempts}...")
+
+                # Refresh window position before screenshot
+                if not self._refresh_window_position():
+                    logger.warning("  ⚠ Window position refresh failed, retrying...")
+                    time.sleep(retry_delay)
+                    continue
                 
-                step_result = StepResult("find_input_box", True,
-                                      data={'coordinates': coordinates, 'method': 'fallback'})
-                self.step_results.append(step_result)
-                return step_result
-            
-            threshold = self.THRESHOLDS['input_box']
-            
-            logger.info(f"  → Matching template: {template_path.name} (threshold={threshold})")
-            
-            coordinates = PatternMatcher.find_pattern(
-                str(screenshot_path),
-                str(template_path),
-                self.window_rect,
-                threshold
-            )
-            
-            if coordinates:
-                logger.info(f"  ✓ Input box found at: {coordinates}")
-                step_result = StepResult("find_input_box", True,
-                                      data={'coordinates': coordinates, 'method': 'template'})
-            else:
-                # Fallback to center
-                logger.warning("  ⚠ Input box not found, using window center")
-                left, top, right, bottom = self.window_rect
-                center_x = (left + right) // 2
-                center_y = (top + bottom) // 2 + 100  # Slightly below center
-                coordinates = (center_x, center_y)
+                # Take new screenshot
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                screenshot_path = self.screenshot_dir / f"input_box_{timestamp}.png"
                 
-                step_result = StepResult("find_input_box", True,
-                                      data={'coordinates': coordinates, 'method': 'fallback'})
-            
+                logger.info("  → Taking screenshot...")
+                time.sleep(0.5)  # Wait for UI to settle
+                screenshot = ScreenshotCapture.capture_window(self.window_rect, str(screenshot_path))
+                
+                # Template matching
+                template_path = self.template_dir / self.TEMPLATES['input_box']
+                
+                # Check if template exists
+                if not template_path.exists():
+                    logger.warning(f"  ⚠ Template not found: {template_path}")
+                    logger.warning("  ⚠ Using window center as fallback")
+                    left, top, right, bottom = self.window_rect
+                    center_x = (left + right) // 2
+                    center_y = (top + bottom) // 2 + 100
+                    return StepResult("find_input_box", True, data={'coordinates': (center_x, center_y), 'method': 'fallback'})
+                
+                threshold = self.THRESHOLDS['input_box']
+                logger.info(f"  → Matching template: {template_path.name} (threshold={threshold})")
+                
+                coordinates = PatternMatcher.find_pattern(
+                    str(screenshot_path),
+                    str(template_path),
+                    self.window_rect,
+                    threshold
+                )
+                
+                if coordinates:
+                    logger.info(f"  ✓ Input box found at: {coordinates}")
+                    step_result = StepResult("find_input_box", True, data={'coordinates': coordinates, 'method': 'template'})
+                    self.step_results.append(step_result)
+                    return step_result
+                
+                # No match, wait and retry
+                time.sleep(retry_delay)
+                
+            # Fallback to center if all template matching fails
+            logger.warning("  ⚠ Input box not found after multiple attempts, using window center")
+            left, top, right, bottom = self.window_rect
+            center_x = (left + right) // 2
+            center_y = (top + bottom) // 2 + 100
+            step_result = StepResult("find_input_box", True, data={'coordinates': (center_x, center_y), 'method': 'fallback'})
             self.step_results.append(step_result)
             return step_result
             
@@ -637,9 +672,11 @@ class AITask(BaseTask):
         Returns:
             bool: True if window found and position updated
         """
+        if not HAS_WIN32:
+            logger.error("  ✗ win32 libraries not available")
+            return False
+            
         try:
-            import win32gui
-            import win32con
             
             # Check if window still exists
             if not self.hwnd or not win32gui.IsWindow(self.hwnd):
