@@ -9,6 +9,7 @@ from tkinter import ttk
 import threading
 import time
 import logging
+import ctypes
 from typing import Optional, Dict, Any
 from .overlay_config import OverlayConfig, OverlayPosition
 from .keyboard_handler import KeyboardHandler
@@ -84,6 +85,32 @@ class StatusOverlay:
         width, height = self.config.get_dimensions()
         self.root.geometry(f"{width}x{height}")
         
+        # Windows-specific: Exclude from screen capture (WDA) & Click-through
+        # This makes the overlay invisible to screenshots/videos but visible to user
+        # AND allows mouse clicks to pass through to windows below
+        try:
+            self.root.update()  # Ensure winfo_id is valid
+            hwnd = ctypes.windll.user32.GetParent(self.root.winfo_id())
+            if hwnd:
+                # 1. WDA_EXCLUDEFROMCAPTURE = 0x00000011
+                WDA_EXCLUDEFROMCAPTURE = 0x00000011
+                ctypes.windll.user32.SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE)
+                logger.info(f"SetWindowDisplayAffinity applied to HWND {hwnd}")
+
+                # 2. Set click-through (WS_EX_TRANSPARENT)
+                # GWL_EXSTYLE = -20, WS_EX_LAYERED = 0x80000, WS_EX_TRANSPARENT = 0x20
+                GWL_EXSTYLE = -20
+                WS_EX_LAYERED = 0x80000
+                WS_EX_TRANSPARENT = 0x20
+                
+                # Get current styles
+                style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+                # Add Layered and Transparent styles
+                ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED | WS_EX_TRANSPARENT)
+                logger.info(f"Click-through style applied to HWND {hwnd}")
+        except Exception as e:
+            logger.warning(f"Failed to set window properties (WDA/Click-through): {e}")
+        
         # Set background
         bg_color = '#1a1a1a'
         self.root.configure(bg=bg_color)
@@ -92,15 +119,15 @@ class StatusOverlay:
         main_frame = tk.Frame(self.root, bg=bg_color)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
         
-        # Title with emoji
+        # Title with emoji (Slightly smaller)
         title_label = tk.Label(
             main_frame,
             text="🤖 AI TASK MONITOR",
-            font=('Arial', 14, 'bold'),
+            font=('Arial', 12, 'bold'),
             bg=bg_color,
             fg='#00ff88'
         )
-        title_label.pack(pady=(0, 5))
+        title_label.pack(pady=(0, 2))
         
         # Separator
         separator = tk.Frame(main_frame, bg='#444444', height=2)
@@ -217,12 +244,12 @@ class StatusOverlay:
         # ESC hint
         esc_label = tk.Label(
             main_frame,
-            text="按 ESC 取消",
+            text="ESC to cancel",
             font=('Arial', 8),
             bg=bg_color,
-            fg='#666666'
+            fg='#555555'
         )
-        esc_label.pack(pady=(10, 0))
+        esc_label.pack(pady=(5, 0))
         
         # Update position
         self._update_position()
