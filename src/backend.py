@@ -88,9 +88,19 @@ logger = logging.getLogger(__name__)
 task_manager = TaskManager()
 
 # Initialize Workflow Registry (load YAML workflows)
-# Looks for workflows directory at project root (parent of src)
+# Handle both development and PyInstaller exe modes
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    # Running as PyInstaller exe - use _MEIPASS
+    base_path = Path(sys._MEIPASS)
+    workflows_path = base_path / "workflows"
+    logger.info(f"EXE mode: Loading workflows from bundled path: {workflows_path}")
+else:
+    # Running in development mode - use relative path
+    workflows_path = Path(__file__).parent.parent / "workflows"
+    logger.info(f"Dev mode: Loading workflows from: {workflows_path}")
+
 workflow_registry = WorkflowRegistry(
-    workflows_dir=str(Path(__file__).parent.parent / "workflows")
+    workflows_dir=str(workflows_path)
 )
 
 # Initialize the global Task Queue

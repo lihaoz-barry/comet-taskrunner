@@ -23,6 +23,8 @@ a = Analysis(
         ('templates', 'templates'),
         # Include config directory for window matching configuration
         ('config', 'config'),
+        # Include workflows directory for YAML workflow definitions
+        ('workflows', 'workflows'),
         # Include screenshots directory (create if doesn't exist)
     ],
     hiddenimports=[
