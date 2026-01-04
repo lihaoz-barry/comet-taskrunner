@@ -589,11 +589,12 @@ def start_task_monitor():
 # MAIN APPLICATION ENTRY
 # ============================================================================
 
-if __name__ == '__main__':
+def run_server():
     import atexit
     from utils.cleanup import cleanup_temp_files
+    global task_queue
 
-    # Register cleanup on normal exit
+    # Register cleanup
     atexit.register(cleanup_temp_files)
 
     logger.info("=" * 60)
@@ -619,26 +620,38 @@ if __name__ == '__main__':
         logger.warning("⚠ Keyboard module not available - ESC cancellation disabled")
     
     # Security Check: Ensure API Key is set before exposing to 0.0.0.0
+    # Note: In a tray app context, we might want to relax this or default it?
+    # For now, we keep secure defaults but allow local-only if needed.
     api_key = os.environ.get('COMET_API_KEY')
-    if not api_key:
-        print("\n" + "!" * 80)
-        print("CRITICAL SECURITY ERROR: COMET_API_KEY environment variable is not set!")
-        print("!" * 80)
-        print("\nTo securely expose the server to the network, you MUST set an API Key.")
-        print("\n[Option 1] Temporary (Current Session):")
-        print("  set COMET_API_KEY=my-secret-password-123")
-        print("\n[Option 2] Permanent (User Environment):")
-        print("  setx COMET_API_KEY \"my-secret-password-123\"")
-        print("\n[Option 3] .env file (Recommended for Dev):")
-        print("  Create a .env file with: COMET_API_KEY=my-secret-password-123")
-        print("\n" + "!" * 80 + "\n")
-        input("Press Enter to exit...")  # Keep window open to read error
-        sys.exit(1)
-        
-    logger.info(f"✓ Security: API Key detected (Length: {len(api_key)})")
+    allow_remote = True
     
-    # Initialize TaskQueue with comet_path
-    # Note: task_queue is already declared at module level (line 57)
+    if not api_key:
+        # Check if we should fallback to local-only mode (e.g. for Tray App usage)
+        if os.environ.get('COMET_LOCAL_ONLY'):
+            logger.warning("COMET_API_KEY not set. Falling back to LOCALHOST ONLY mode.")
+            allow_remote = False
+        else:
+            logger.error("CRITICAL SECURITY ERROR: COMET_API_KEY environment variable is not set!")
+            # If running as a service/tray, strictly exiting might be hard to debut.
+            # But adhering to security first.
+            if __name__ == '__main__':
+                # Interactive mode
+                print("\n" + "!" * 80)
+                print("CRITICAL SECURITY ERROR: COMET_API_KEY environment variable is not set!")
+                print("!" * 80)
+                input("Press Enter to exit...")
+                sys.exit(1)
+            else:
+                # Library mode (Tray app)
+                # Keep running but bind only to 127.0.0.1 implicitly via logic below?
+                # Or just raise error? Let's default to safe failure.
+                logger.error("Backend failed to start due to missing API Key.")
+                return
+
+    if allow_remote:
+        logger.info(f"✓ Security: API Key detected (Length: {len(api_key)})")
+    
+    # Initialize TaskQueue
     comet_path = get_comet_path()
     if comet_path:
         task_queue = TaskQueue(comet_path)
@@ -646,23 +659,27 @@ if __name__ == '__main__':
     else:
         logger.warning("⚠ Comet browser not found, TaskQueue not initialized")
     
-    logger.info("URL Task API: POST /execute/url")
-    logger.info("AI Task API:  POST /execute/ai")
-    logger.info("Status API:   GET /status/<task_id>")
-    logger.info("Manager API:  GET /manager/status")
-    logger.info("=" * 60)
-    
-    # Start background monitoring thread
     start_task_monitor()
     
-    try:
-        # Start Flask server on 0.0.0.0 (All interfaces)
+    if allow_remote:
+        host = '0.0.0.0'
         logger.info("Server listening on 0.0.0.0:5000 (Local + Remote)")
-        app.run(host='0.0.0.0', port=5000, debug=False)
+    else:
+        host = '127.0.0.1'
+        logger.info("Server listening on 127.0.0.1:5000 (Localhost Only)")
+
+    try:
+        app.run(host=host, port=5000, debug=False, use_reloader=False)
     except KeyboardInterrupt:
-        print("\n")
+        pass
+    except Exception as e:
+        logger.error(f"Server crash: {e}")
+    finally:
         logger.info("Backend shutting down...")
         if task_queue:
             task_queue.shutdown()
         cleanup_temp_files()
         logger.info("Goodbye!")
+
+if __name__ == '__main__':
+    run_server()
