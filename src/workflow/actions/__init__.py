@@ -12,6 +12,7 @@ from .detect_loop_action import DetectLoopAction
 from .completion_action import CompletionAction
 from .close_window_action import CloseWindowAction
 from .clipboard_action import ClipboardAction
+from .screenshot_action import ScreenshotAction
 
 # Register actions
 ActionRegistry.register(WaitAction)
@@ -24,3 +25,4 @@ ActionRegistry.register(DetectLoopAction)
 ActionRegistry.register(CompletionAction)
 ActionRegistry.register(CloseWindowAction)
 ActionRegistry.register(ClipboardAction)
+ActionRegistry.register(ScreenshotAction)
