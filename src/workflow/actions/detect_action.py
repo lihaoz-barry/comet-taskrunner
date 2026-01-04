@@ -102,6 +102,7 @@ class DetectAction(BaseAction):
                 if coordinates:
                     return StepResult(self.action_type, True, data={
                         'coordinates': coordinates,
+                        'center': coordinates,
                         'window_rect': window_rect,
                         'hwnd': hwnd
                     })

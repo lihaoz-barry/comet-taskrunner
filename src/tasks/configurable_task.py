@@ -39,7 +39,7 @@ class ConfigurableTask(BaseTask):
         Start workflow execution in a background thread.
         Returns a dummy process ID since we manage our own thread.
         """
-        logger.info(f"Starting configurable task: {self.workflow_config.name}")
+        logger.info(f"TASK STARTED: {self.workflow_config.name}")
         
         self.execution_thread = threading.Thread(
             target=self._run_workflow,
@@ -74,6 +74,7 @@ class ConfigurableTask(BaseTask):
             self.complete()
             
         except Exception as e:
+            logger.info(f"TASK FAILED: {str(e)}")
             self.fail(str(e))
 
     def check_completion(self) -> bool:
@@ -92,29 +93,35 @@ class ConfigurableTask(BaseTask):
             
         progress_percent = int((len(self.step_results) / self.total_steps) * 100) if self.total_steps > 0 else 0
         
+        if 0 < self.current_step_index <= len(self.workflow_config.steps):
+            step = self.workflow_config.steps[self.current_step_index - 1]
+            # Use display name if available, otherwise name
+            step_name = step.display_name or step.name
+            # Also update status text to match
+            status_text = step_name
+        else:
+            step_name = status_text
+
         return {
             'has_steps': True,
             'current_step': self.current_step_index,
             'total_steps': self.total_steps,
             'progress_percent': progress_percent,
             'status_text': status_text,
+            'current_step_name': step_name,
             'details': {
                 'workflow_name': self.workflow_config.name,
                 'current_step_id': self.workflow_config.steps[self.current_step_index-1].id if 0 < self.current_step_index <= len(self.workflow_config.steps) else None,
-                'inputs': self.inputs
+                'inputs': self.inputs,
+                'step_logs': self.executor.current_step_logs if hasattr(self.executor, 'current_step_logs') else []
             }
         }
 
     def get_automation_progress(self) -> Dict[str, Any]:
         """
-        Get progress in format expected by StatusOverlay.
+        Alias for get_progress() to satisfy TaskQueue overlay interface.
         """
-        return {
-            'current_step': self.current_step_index,
-            'total_steps': self.total_steps,
-            'completed_steps': len(self.step_results),
-            'progress_percent': int((len(self.step_results) / self.total_steps) * 100) if self.total_steps > 0 else 0
-        }
+        return self.get_progress()
 
     @property
     def STEP_DESCRIPTIONS(self) -> Dict[int, tuple]:

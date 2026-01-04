@@ -124,6 +124,37 @@ class WindowAction(BaseAction):
                         time.sleep(retry_delay)
             
             return StepResult(self.action_type, False, error=f"Could not find/activate window: {title_pattern}")
+        
+        elif operation == 'maximize':
+            # Maximize window operation
+            import win32gui
+            import win32con
+            
+            # First find the window
+            result = WindowManager.find_comet_window(
+                keywords=[title_pattern], 
+                exclude_title=exclude_title,
+                require_process=require_process
+            )
+            
+            if result:
+                hwnd, rect = result
+                try:
+                    # Activate first
+                    WindowManager.activate_window(hwnd)
+                    time.sleep(0.2)
+                    # Maximize
+                    win32gui.ShowWindow(hwnd, win32con.SW_MAXIMIZE)
+                    time.sleep(0.3)
+                    # Get new rect after maximize
+                    new_rect = win32gui.GetWindowRect(hwnd)
+                    logger.info(f"Maximized window: {title_pattern}")
+                    return StepResult(self.action_type, True, data={'hwnd': hwnd, 'rect': new_rect})
+                except Exception as e:
+                    logger.error(f"Failed to maximize window: {e}")
+                    return StepResult(self.action_type, False, error=str(e))
+            else:
+                return StepResult(self.action_type, False, error=f"Window not found: {title_pattern}")
             
         else:
             return StepResult(self.action_type, False, error=f"Unknown operation: {operation}")

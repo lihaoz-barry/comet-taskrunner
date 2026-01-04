@@ -63,11 +63,13 @@ class TaskQueue:
         # Overlay system (managed at queue level)
         self.overlay = None
         self.overlay_task_id = None  # Track which task owns the overlay
+        logger.info(f"Overlay availability check: {OVERLAY_AVAILABLE}")
         if OVERLAY_AVAILABLE:
             try:
                 self.overlay = StatusOverlay()
                 self.overlay.set_cancel_callback(self._cancel_current_task)
-                logger.info("✓ TaskQueue overlay initialized")
+                self.overlay.start() # Start persistent UI thread
+                logger.info("✓ TaskQueue overlay initialized and thread started")
             except Exception as e:
                 logger.warning(f"Failed to initialize TaskQueue overlay: {e}")
                 self.overlay = None
@@ -132,7 +134,7 @@ class TaskQueue:
                     step_description="准备启动自动化任务...",
                     next_step_description="等待浏览器初始化"
                 )
-                logger.info(f"Overlay displayed for task {task.task_id}")
+                logger.info(f"Overlay show requested for task {task.task_id} (Type: {task.task_type})")
             except Exception as e:
                 logger.warning(f"Failed to show overlay: {e}")
 
@@ -228,13 +230,25 @@ class TaskQueue:
                         task_id = self.current_task.task_id[:8]
                         status = self.current_task.status.value
 
-                        # Get automation progress for AI tasks
+                        # Colors for mini-highlights
+                        from utils.logger import CYAN, YELLOW, GREEN, RESET, MAGENTA
+                        
+                        # Get automation progress
                         progress_info = ""
                         if hasattr(self.current_task, 'get_automation_progress'):
                             prog = self.current_task.get_automation_progress()
-                            progress_info = f" - Step {prog.get('current_step', 0)}/{prog.get('total_steps', 0)}"
+                            cur = prog.get('current_step', 0)
+                            tot = prog.get('total_steps', 0)
+                            name = prog.get('current_step_name', "")
+                            
+                            progress_info = f" - Step {CYAN}{cur}/{tot}{RESET}: {MAGENTA}{name}{RESET}"
 
-                        logger.info(f"→ CURRENT: [{task_type.upper()}] {task_id} - {status}{progress_info}")
+                        # Status color
+                        status_color = YELLOW
+                        if status == 'done': status_color = GREEN
+                        elif status == 'failed': status_color = '\033[31m' # RED
+
+                        logger.info(f"→ CURRENT: [{task_type.upper()}] {CYAN}{task_id}{RESET} - {status_color}{status}{RESET}{progress_info}")
                     else:
                         logger.info("→ CURRENT: <idle>")
 
@@ -268,6 +282,7 @@ class TaskQueue:
                                     step_description=current_desc,
                                     next_step_description=next_desc
                                 )
+                                logger.debug(f"Overlay updated for step {current_step}")
                         except Exception as e:
                             logger.debug(f"Failed to update overlay: {e}")
 
@@ -380,14 +395,14 @@ class TaskQueue:
     # ========================================================================
 
     def _hide_overlay(self):
-        """Hide and cleanup overlay"""
+        """Hide overlay (but keep thread running)"""
         if self.overlay and self.overlay_task_id:
             try:
-                self.overlay.close()
+                self.overlay.hide()
                 self.overlay_task_id = None
-                logger.info("Overlay closed")
+                logger.info("Overlay hidden")
             except Exception as e:
-                logger.warning(f"Failed to close overlay: {e}")
+                logger.warning(f"Failed to hide overlay: {e}")
 
     def _cancel_current_task(self):
         """Cancel callback for ESC key press"""
@@ -415,8 +430,12 @@ class TaskQueue:
         logger.info("TaskQueue shutting down")
         self.monitoring = False
 
-        # Close overlay if open
-        self._hide_overlay()
+        # Close overlay completely on shutdown
+        if self.overlay:
+            try:
+                self.overlay.close()
+            except Exception as e:
+                logger.warning(f"Error closing overlay: {e}")
 
         if self.monitor_thread.is_alive():
             self.monitor_thread.join(timeout=2)

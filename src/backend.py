@@ -20,6 +20,11 @@ Each layer is independent and can be replaced/reused.
 
 import os
 import sys
+import os
+
+# Add current directory to sys.path to allow imports from src/
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 import subprocess
 import logging
 import winreg
@@ -32,6 +37,7 @@ from dotenv import load_dotenv  # Load .env file
 # Load environment variables from .env file (if present)
 load_dotenv()
 
+# Import task components (independent, reusable)
 # Import task components (independent, reusable)
 from tasks import BaseTask, TaskStatus, TaskType, URLTask, AITask, ConfigurableTask
 from workflow import WorkflowRegistry, WorkflowConfig
@@ -77,11 +83,16 @@ def require_auth(f):
     return decorated
 
 # Configure detailed logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# Configure detailed logging
+# logging.basicConfig(
+#     level=logging.INFO,
+#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# )
+# logger = logging.getLogger(__name__)
+
+# Use Custom Hybrid Logger
+from utils.logger import setup_logging
+logger = setup_logging()
 
 # Initialize the global Task Manager
 # This manages ALL tasks (both URL and AI) in memory
@@ -102,6 +113,14 @@ else:
 workflow_registry = WorkflowRegistry(
     workflows_dir=str(workflows_path)
 )
+
+# Initialize Composite Action Registry (load reusable action YAMLs)
+from workflow.actions.composite_action import CompositeActionRegistry
+composite_actions_path = workflows_path / "actions"
+if composite_actions_path.exists():
+    CompositeActionRegistry.load_from_directory(str(composite_actions_path))
+else:
+    logger.info(f"No composite actions directory found at: {composite_actions_path}")
 
 # Initialize the global Task Queue
 # This coordinates sequential task execution (one at a time)

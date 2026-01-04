@@ -1,0 +1,57 @@
+# Composite Action: Capture Copy
+# Clicks a copy button and retrieves clipboard content
+# Designed to be reusable with different copy button templates
+
+composite_action:
+  name: "capture_copy"
+  description: "Find and click a copy button, then get clipboard content"
+
+inputs:
+  - name: "copy_button_template"
+    type: "string"
+    required: true
+    description: "PNG template file for the copy button to detect"
+  
+  - name: "detection_threshold"
+    type: "float"
+    required: false
+    default: 0.7
+    description: "Template matching threshold (0.0-1.0)"
+  
+  - name: "click_delay"
+    type: "float"
+    required: false
+    default: 0.5
+    description: "Delay after clicking before reading clipboard"
+
+steps:
+  # Step 1: Detect the copy button
+  - id: "find_button"
+    action: "detect"
+    config:
+      template: "inputs.copy_button_template"
+      threshold: "inputs.detection_threshold"
+    outputs:
+      - name: "coordinates"
+      - name: "center"
+
+  # Step 2: Click the copy button
+  - id: "click_button"
+    action: "click"
+    config:
+      coordinates: "find_button.center"
+      post_delay: "inputs.click_delay"
+
+  # Step 3: Get clipboard content
+  - id: "get_clipboard"
+    action: "clipboard"
+    config:
+      operation: "get"
+    outputs:
+      - name: "content"
+
+outputs:
+  - name: "content"
+    from: "get_clipboard.content"
+  - name: "button_location"
+    from: "find_button.center"

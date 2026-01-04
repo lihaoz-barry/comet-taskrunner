@@ -25,11 +25,7 @@ class CloseWindowAction(BaseAction):
     def execute(self, config: Dict[str, Any], context: Dict[str, Any]) -> StepResult:
         """Execute close window action"""
         title_pattern = config.get('window_title_pattern')
-        pre_delay = float(config.get('pre_delay', 0.0))
-        
-        # Wait before closing (user review time)
-        if pre_delay > 0:
-            time.sleep(pre_delay)
+        # Note: pre_delay is now handled universally by StepExecutor
         
         # If no title provided, try to use last known HWND from context?
         # For now, let's require finding it or using cached

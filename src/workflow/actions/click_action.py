@@ -9,6 +9,8 @@ class ClickAction(BaseAction):
     
     Inputs (Config):
         coordinates (list/tuple): [x, y] coordinates to click
+        offset_x (int): Optional X offset from coordinates (default: 0)
+        offset_y (int): Optional Y offset from coordinates (default: 0)
         click_type (str): 'single', 'double', 'right' (default: 'single')
         pre_delay (float): Wait before click (default: 0.1s)
         post_delay (float): Wait after click (default: 0.5s)
@@ -17,7 +19,7 @@ class ClickAction(BaseAction):
         clicked_at (tuple): The coordinates clicked
         
     Effect:
-        Moves mouse cursor to {coordinates}.
+        Moves mouse cursor to {coordinates}+offset.
         Performs the specified click type.
     """
     
@@ -35,22 +37,29 @@ class ClickAction(BaseAction):
         pre_delay = float(config.get('pre_delay', 0.1))
         post_delay = float(config.get('post_delay', 0.5))
         
+        # Support offset from coordinates
+        offset_x = int(config.get('offset_x', 0))
+        offset_y = int(config.get('offset_y', 0))
+        
         time.sleep(pre_delay)
         
         x, y = coordinates
+        x = int(x) + offset_x
+        y = int(y) + offset_y
+        
         MouseController.move_to(x, y)
         time.sleep(0.1)
         
         if click_type == 'double':
-            MouseController.click(x, y) # TODO: Implement double click in MouseController if needed or just click twice
+            MouseController.click(x, y)
             time.sleep(0.1)
             MouseController.click(x, y)
         elif click_type == 'right':
-             # TODO: Implement right click support if needed
              MouseController.click(x, y) 
         else:
             MouseController.click(x, y)
             
         time.sleep(post_delay)
         
-        return StepResult(self.action_type, True, data={'clicked_at': coordinates})
+        return StepResult(self.action_type, True, data={'clicked_at': (x, y)})
+

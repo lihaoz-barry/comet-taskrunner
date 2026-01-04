@@ -29,6 +29,7 @@ class StepExecutor:
         
         # Initialize context with inputs
         self.context['inputs'] = {}
+        self.current_step_logs = []  # Capture logs for current step
         
         # Resolve template directory
         import sys
@@ -50,10 +51,34 @@ class StepExecutor:
         """Set workflow input values"""
         self.context['inputs'] = inputs
         
+    def log(self, message: str):
+        """Add a log entry for the current step"""
+        self.current_step_logs.append(message)
+        # Emit distinct log for formatter if it's a structural update
+        if "Step:" in message:
+             logger.info(message)
+        else:
+             logger.info(f"  > {message}") # Indent details
+
     def execute_step(self, step: StepConfig) -> StepResult:
         """Execute a single workflow step"""
+        self.current_step_logs = []  # Clear logs for new step
+        # Emit "Step Start" signal for formatter
+        logger.info(f"Step: {step.name}...") 
+        import time
+        import time
+        
         action_type = step.action_config.action
-        action_class = ActionRegistry.get(action_type)
+        
+        # Handle composite actions (format: "composite:action_name")
+        if action_type.startswith('composite:'):
+            composite_name = action_type.split(':', 1)[1]
+            from .actions.composite_action import CompositeAction
+            action_class = CompositeAction
+            # Store composite name in config for the action
+            step.action_config.config['_composite_name'] = composite_name
+        else:
+            action_class = ActionRegistry.get(action_type)
         
         if not action_class:
             error = f"Unknown action type: {action_type}"
@@ -64,9 +89,21 @@ class StepExecutor:
             # Resolve configuration variables
             resolved_config = self._resolve_config(step.action_config.config)
             
+            # Universal pre_delay - applies to ALL actions
+            pre_delay = float(resolved_config.pop('pre_delay', 0.0))
+            if pre_delay > 0:
+                logger.debug(f"Pre-delay: {pre_delay}s before {step.name}")
+                time.sleep(pre_delay)
+            
             # Execute action
             action = action_class()
             result = action.execute(resolved_config, self.context)
+            
+            # Universal post_delay - applies to ALL actions
+            post_delay = float(resolved_config.pop('post_delay', 0.0) if 'post_delay' in step.action_config.config else 0.0)
+            if post_delay > 0:
+                logger.debug(f"Post-delay: {post_delay}s after {step.name}")
+                time.sleep(post_delay)
             
             # Store outputs in context
             if result.success and step.action_config.outputs:
@@ -79,10 +116,20 @@ class StepExecutor:
                         self.context[context_key] = result.data[output_name]
                         logger.debug(f"Stored output: {context_key} = {result.data[output_name]}")
             
+            # Log Success
+            if result.success:
+                 logger.info(f"Step: {step.name} Completed")
+            else:
+                 logger.info(f"Step: {step.name} Failed")
+
             return result
             
         except Exception as e:
-            logger.error(f"Error executing step {step.name}: {e}")
+            error_msg = f"Error executing step {step.name}: {e}"
+            self.log(error_msg)
+            # Log Failure explicitly for formatter
+            logger.info(f"Step: {step.name} Failed")
+            
             import traceback
             traceback.print_exc()
             return StepResult(step.name, False, error=str(e))
