@@ -35,11 +35,11 @@ if not exist resources\comet.ico (
 REM 6. Build the tray executable
 set PYTHONPATH=%PYTHONPATH%;%CD%\src
 pyinstaller --onefile --noconsole ^
+    --additional-hooks-dir "hooks" ^
     --add-data "resources;resources" ^
     --add-data "workflows;workflows" ^
     --paths "src" ^
     --collect-submodules tasks ^
-    --collect-submodules workflow ^
     --collect-submodules utils ^
     --collect-submodules overlay ^
     --icon "resources\comet.ico" ^
