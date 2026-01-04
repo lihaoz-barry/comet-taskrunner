@@ -55,7 +55,16 @@ class StepExecutor:
         import time
         
         action_type = step.action_config.action
-        action_class = ActionRegistry.get(action_type)
+        
+        # Handle composite actions (format: "composite:action_name")
+        if action_type.startswith('composite:'):
+            composite_name = action_type.split(':', 1)[1]
+            from .actions.composite_action import CompositeAction
+            action_class = CompositeAction
+            # Store composite name in config for the action
+            step.action_config.config['_composite_name'] = composite_name
+        else:
+            action_class = ActionRegistry.get(action_type)
         
         if not action_class:
             error = f"Unknown action type: {action_type}"

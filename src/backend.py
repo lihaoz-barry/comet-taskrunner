@@ -103,6 +103,14 @@ workflow_registry = WorkflowRegistry(
     workflows_dir=str(workflows_path)
 )
 
+# Initialize Composite Action Registry (load reusable action YAMLs)
+from workflow.actions.composite_action import CompositeActionRegistry
+composite_actions_path = workflows_path / "actions"
+if composite_actions_path.exists():
+    CompositeActionRegistry.load_from_directory(str(composite_actions_path))
+else:
+    logger.info(f"No composite actions directory found at: {composite_actions_path}")
+
 # Initialize the global Task Queue
 # This coordinates sequential task execution (one at a time)
 task_queue = None  # Will be initialized after getting comet_path
