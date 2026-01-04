@@ -165,6 +165,17 @@ steps:
       status: "success"
       message: "Task completed successfully"
 
+  # --------------------------------------------------------------------------
+  # Step 11: Close browser window (cleanup for next task)
+  # --------------------------------------------------------------------------
+  - id: "step_11"
+    name: "close_browser"
+    display_name: "Close Browser"
+    action: "close_window"
+    config:
+      window_title_pattern: "Comet"
+      pre_delay: 5.0  # Wait 5 seconds for user to review results
+
 error_handling:
   on_step_failure: "abort"
   max_retries: 3
