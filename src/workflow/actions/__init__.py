@@ -14,6 +14,7 @@ from .close_window_action import CloseWindowAction
 from .clipboard_action import ClipboardAction
 from .screenshot_action import ScreenshotAction
 from .webhook_action import WebhookAction
+from .scroll_action import ScrollAction
 
 # Register actions
 ActionRegistry.register(WaitAction)
@@ -28,3 +29,5 @@ ActionRegistry.register(CloseWindowAction)
 ActionRegistry.register(ClipboardAction)
 ActionRegistry.register(ScreenshotAction)
 ActionRegistry.register(WebhookAction)
+ActionRegistry.register(ScrollAction)
+

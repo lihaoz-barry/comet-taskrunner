@@ -84,6 +84,7 @@ a = Analysis(
         'workflow.actions.screenshot_action',
         'workflow.actions.webhook_action',
         'workflow.actions.composite_action',
+        'workflow.actions.scroll_action',
         # Utility modules
         'utils',
         'utils.cleanup',

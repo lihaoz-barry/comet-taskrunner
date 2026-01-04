@@ -1,0 +1,84 @@
+# Composite Action: Find Copy Button with Scroll
+# Uses a reference anchor image to scroll to bottom before finding copy button
+# This ensures the copy button is visible even if content is long
+
+composite_action:
+  name: "find_copy_with_scroll"
+  description: "Scroll to bottom using anchor position, then find copy button"
+
+inputs:
+  - name: "anchor_template"
+    type: "string"
+    required: false
+    default: "comet_new_chat_button.png"
+    description: "PNG template for anchor (New Chat button)"
+  
+  - name: "anchor_offset_y"
+    type: "integer"
+    required: false
+    default: 25
+    description: "Pixels below anchor to click and scroll"
+  
+  - name: "scroll_clicks"
+    type: "integer"
+    required: false
+    default: 10
+    description: "Number of scroll clicks to reach bottom"
+  
+  - name: "copy_button_template"
+    type: "string"
+    required: false
+    default: "comet_copy_button.png"
+    description: "PNG template for copy button"
+  
+  - name: "copy_threshold"
+    type: "float"
+    required: false
+    default: 0.7
+    description: "Detection threshold for copy button"
+
+steps:
+  # Step 1: Find anchor (New Chat Button) position
+  - id: "find_anchor"
+    action: "detect"
+    config:
+      template: "inputs.anchor_template"
+      threshold: 0.7
+      timeout: 10.0
+    outputs:
+      - name: "center"
+      - name: "coordinates"
+
+  # Step 2: Click below anchor to focus the content area
+  - id: "click_focus"
+    action: "click"
+    config:
+      coordinates: "find_anchor.center"
+      offset_y: "inputs.anchor_offset_y"
+      post_delay: 0.3
+
+  # Step 3: Scroll down to bottom
+  - id: "scroll_down"
+    action: "scroll"
+    config:
+      direction: "down"
+      clicks: "inputs.scroll_clicks"
+      position: "current"
+      post_delay: 0.5
+
+  # Step 4: Find copy button
+  - id: "find_copy"
+    action: "detect"
+    config:
+      template: "inputs.copy_button_template"
+      threshold: "inputs.copy_threshold"
+      timeout: 10.0
+    outputs:
+      - name: "center"
+      - name: "coordinates"
+
+outputs:
+  - name: "center"
+    from: "find_copy.center"
+  - name: "coordinates"
+    from: "find_copy.coordinates"

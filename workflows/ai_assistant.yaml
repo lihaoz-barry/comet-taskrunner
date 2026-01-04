@@ -43,6 +43,19 @@ steps:
       retry_delay: 2.0
 
   # --------------------------------------------------------------------------
+  # Step 2a: Maximize browser window
+  # --------------------------------------------------------------------------
+  - id: "step_2a"
+    name: "maximize_window"
+    display_name: "Maximize Window"
+    action: "window"
+    config:
+      operation: "maximize"
+      window_title_pattern: "Comet"
+      exclude_title: "Task Runner"
+      require_process: "comet.exe"
+
+  # --------------------------------------------------------------------------
   # Step 3: Find Assistant button using template matching
   # --------------------------------------------------------------------------
   - id: "step_3"
@@ -166,16 +179,18 @@ steps:
       message: "Task completed successfully"
 
   # --------------------------------------------------------------------------
-  # Step 10a: Detect copy button
+  # Step 10a: Scroll to bottom and find copy button (using composite action)
   # --------------------------------------------------------------------------
   - id: "step_10a"
     name: "find_copy_button"
     display_name: "Find Copy Button"
-    action: "detect"
+    action: "composite:find_copy_with_scroll"
     config:
-      template: "comet_copy_button.png"
-      threshold: 0.7
-      timeout: 30.0
+      anchor_template: "comet_new_chat_button.png"
+      anchor_offset_y: 25
+      scroll_clicks: 10
+      copy_button_template: "comet_copy_button.png"
+      copy_threshold: 0.7
     outputs:
       - name: "center"
       - name: "coordinates"
