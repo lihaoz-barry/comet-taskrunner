@@ -11,6 +11,7 @@ from .key_press_action import KeyPressAction
 from .detect_loop_action import DetectLoopAction
 from .completion_action import CompletionAction
 from .close_window_action import CloseWindowAction
+from .clipboard_action import ClipboardAction
 
 # Register actions
 ActionRegistry.register(WaitAction)
@@ -22,3 +23,4 @@ ActionRegistry.register(KeyPressAction)
 ActionRegistry.register(DetectLoopAction)
 ActionRegistry.register(CompletionAction)
 ActionRegistry.register(CloseWindowAction)
+ActionRegistry.register(ClipboardAction)
