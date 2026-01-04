@@ -70,6 +70,21 @@ class CustomFormatter(logging.Formatter):
 
 def setup_logging():
     """Configure root logger with custom formatter and filters"""
+    import os
+    
+    # Determine base directory
+    if getattr(sys, 'frozen', False):
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        # From src/utils/logger.py, go up 2 levels
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    
+    log_dir = os.path.join(base_dir, "logs")
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+        
+    log_file = os.path.join(log_dir, "comet.log")
+
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.INFO)
     
@@ -81,6 +96,13 @@ def setup_logging():
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(CustomFormatter())
     root_logger.addHandler(console_handler)
+    
+    # File Handler (New!)
+    file_handler = logging.FileHandler(log_file, encoding='utf-8')
+    # Simple formatter for file (no ANSI colors)
+    file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(file_formatter)
+    root_logger.addHandler(file_handler)
     
     # Filter Noise
     logging.getLogger("werkzeug").setLevel(logging.ERROR) # Hide HTTP 200s
