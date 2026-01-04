@@ -132,6 +132,13 @@ class CompositeAction(BaseAction):
             # Resolve config references
             resolved_config = self._resolve_references(step_config, local_context, step_outputs)
             
+            import time
+            
+            # Universal pre_delay
+            pre_delay = float(resolved_config.pop('pre_delay', 0.0))
+            if pre_delay > 0:
+                time.sleep(pre_delay)
+            
             # Get action class
             action_class = ActionRegistry.get(action_name)
             if not action_class:
@@ -141,6 +148,11 @@ class CompositeAction(BaseAction):
             # Execute action
             action = action_class()
             result = action.execute(resolved_config, local_context)
+            
+            # Universal post_delay
+            post_delay = float(resolved_config.pop('post_delay', 0.0))
+            if post_delay > 0:
+                time.sleep(post_delay)
             
             if not result.success:
                 return StepResult(self.action_type, False, 

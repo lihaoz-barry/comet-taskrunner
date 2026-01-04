@@ -188,7 +188,7 @@ steps:
     config:
       anchor_template: "comet_new_chat_button.png"
       anchor_offset_y: 200
-      scroll_clicks: 500
+      scroll_clicks: 2000
       copy_button_template: "comet_copy_button.png"
       copy_threshold: 0.7
     outputs:
