@@ -62,6 +62,8 @@ class StatusOverlay:
         
         # Keyboard handler for ESC key
         self.keyboard_handler = KeyboardHandler()
+        
+        logger.info(f"Overlay initialized: visible={self.should_be_visible}, running={self.running}")
 
     def start(self):
         """Start the overlay UI thread (persistent)"""
@@ -70,7 +72,7 @@ class StatusOverlay:
             
         self.running = True
         threading.Thread(target=self._run_overlay, daemon=True).start()
-        logger.info("Overlay thread started")
+        logger.info(f"Overlay thread started (running={self.running})")
 
     def show(self):
         """Show the overlay (thread-safe signal)"""
@@ -83,7 +85,7 @@ class StatusOverlay:
         if self.cancel_callback:
             self.keyboard_handler.start_listening(self.cancel_callback)
         
-        logger.info("Overlay show requested")
+        logger.info(f"Overlay show requested. Current actual visibility: {self.is_visible_actual}")
     
     def hide(self):
         """Hide the overlay (thread-safe signal)"""
@@ -139,6 +141,7 @@ class StatusOverlay:
         
         # Initialize hidden
         self.root.withdraw()
+        logger.info("Overlay window created (hidden)")
         
         # Window properties
         self.root.overrideredirect(True)  # No borders
@@ -265,10 +268,12 @@ class StatusOverlay:
                 self._update_position()
                 self.root.attributes('-topmost', True)
                 self.is_visible_actual = True
+                logger.info("Overlay visibility changed: HIDDEN -> VISIBLE")
                 
             elif not self.should_be_visible and self.is_visible_actual:
                 self.root.withdraw()
                 self.is_visible_actual = False
+                logger.info("Overlay visibility changed: VISIBLE -> HIDDEN")
             
             # 2. Update Content (only if visible or pending)
             if self.is_visible_actual:

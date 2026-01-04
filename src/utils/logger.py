@@ -58,8 +58,12 @@ class CustomFormatter(logging.Formatter):
             return f"{timestamp} {BLUE}ℹ{RESET}  {msg}"
         elif record.levelno == logging.WARNING:
             return f"{timestamp} {YELLOW}⚠  {msg}{RESET}"
-        elif record.levelno == logging.ERROR:
+        if record.levelno == logging.ERROR:
             return f"{timestamp} {RED}✖  {msg}{RESET}"
+            
+        # 5. Overlay Debug Logs (High Visibility)
+        if "Overlay" in msg:
+            return f"{timestamp} {MAGENTA}🟣 {msg}{RESET}"
             
         # Default
         return f"{timestamp} {msg}"

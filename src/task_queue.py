@@ -63,6 +63,7 @@ class TaskQueue:
         # Overlay system (managed at queue level)
         self.overlay = None
         self.overlay_task_id = None  # Track which task owns the overlay
+        logger.info(f"Overlay availability check: {OVERLAY_AVAILABLE}")
         if OVERLAY_AVAILABLE:
             try:
                 self.overlay = StatusOverlay()
@@ -133,7 +134,7 @@ class TaskQueue:
                     step_description="准备启动自动化任务...",
                     next_step_description="等待浏览器初始化"
                 )
-                logger.info(f"Overlay displayed for task {task.task_id}")
+                logger.info(f"Overlay show requested for task {task.task_id} (Type: {task.task_type})")
             except Exception as e:
                 logger.warning(f"Failed to show overlay: {e}")
 
@@ -281,6 +282,7 @@ class TaskQueue:
                                     step_description=current_desc,
                                     next_step_description=next_desc
                                 )
+                                logger.debug(f"Overlay updated for step {current_step}")
                         except Exception as e:
                             logger.debug(f"Failed to update overlay: {e}")
 
