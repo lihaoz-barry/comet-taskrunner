@@ -52,6 +52,8 @@ class StepExecutor:
         
     def execute_step(self, step: StepConfig) -> StepResult:
         """Execute a single workflow step"""
+        import time
+        
         action_type = step.action_config.action
         action_class = ActionRegistry.get(action_type)
         
@@ -64,9 +66,21 @@ class StepExecutor:
             # Resolve configuration variables
             resolved_config = self._resolve_config(step.action_config.config)
             
+            # Universal pre_delay - applies to ALL actions
+            pre_delay = float(resolved_config.pop('pre_delay', 0.0))
+            if pre_delay > 0:
+                logger.debug(f"Pre-delay: {pre_delay}s before {step.name}")
+                time.sleep(pre_delay)
+            
             # Execute action
             action = action_class()
             result = action.execute(resolved_config, self.context)
+            
+            # Universal post_delay - applies to ALL actions
+            post_delay = float(resolved_config.pop('post_delay', 0.0) if 'post_delay' in step.action_config.config else 0.0)
+            if post_delay > 0:
+                logger.debug(f"Post-delay: {post_delay}s after {step.name}")
+                time.sleep(post_delay)
             
             # Store outputs in context
             if result.success and step.action_config.outputs:
