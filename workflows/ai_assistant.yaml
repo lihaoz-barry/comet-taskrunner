@@ -187,8 +187,8 @@ steps:
     action: "composite:find_copy_with_scroll"
     config:
       anchor_template: "comet_new_chat_button.png"
-      anchor_offset_y: 25
-      scroll_clicks: 10
+      anchor_offset_y: 200
+      scroll_clicks: 500
       copy_button_template: "comet_copy_button.png"
       copy_threshold: 0.7
     outputs:

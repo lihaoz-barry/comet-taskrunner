@@ -64,7 +64,7 @@ steps:
       direction: "down"
       clicks: "inputs.scroll_clicks"
       position: "current"
-      post_delay: 0.5
+      post_delay: 2.0
 
   # Step 4: Find copy button
   - id: "find_copy"
