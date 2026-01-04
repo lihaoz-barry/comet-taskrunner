@@ -39,7 +39,7 @@ class ConfigurableTask(BaseTask):
         Start workflow execution in a background thread.
         Returns a dummy process ID since we manage our own thread.
         """
-        logger.info(f"Starting configurable task: {self.workflow_config.name}")
+        logger.info(f"TASK STARTED: {self.workflow_config.name}")
         
         self.execution_thread = threading.Thread(
             target=self._run_workflow,
@@ -74,6 +74,7 @@ class ConfigurableTask(BaseTask):
             self.complete()
             
         except Exception as e:
+            logger.info(f"TASK FAILED: {str(e)}")
             self.fail(str(e))
 
     def check_completion(self) -> bool:
@@ -101,7 +102,8 @@ class ConfigurableTask(BaseTask):
             'details': {
                 'workflow_name': self.workflow_config.name,
                 'current_step_id': self.workflow_config.steps[self.current_step_index-1].id if 0 < self.current_step_index <= len(self.workflow_config.steps) else None,
-                'inputs': self.inputs
+                'inputs': self.inputs,
+                'step_logs': self.executor.current_step_logs if hasattr(self.executor, 'current_step_logs') else []
             }
         }
 

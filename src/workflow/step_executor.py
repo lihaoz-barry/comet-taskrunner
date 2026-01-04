@@ -29,6 +29,7 @@ class StepExecutor:
         
         # Initialize context with inputs
         self.context['inputs'] = {}
+        self.current_step_logs = []  # Capture logs for current step
         
         # Resolve template directory
         import sys
@@ -50,8 +51,21 @@ class StepExecutor:
         """Set workflow input values"""
         self.context['inputs'] = inputs
         
+    def log(self, message: str):
+        """Add a log entry for the current step"""
+        self.current_step_logs.append(message)
+        # Emit distinct log for formatter if it's a structural update
+        if "Step:" in message:
+             logger.info(message)
+        else:
+             logger.info(f"  > {message}") # Indent details
+
     def execute_step(self, step: StepConfig) -> StepResult:
         """Execute a single workflow step"""
+        self.current_step_logs = []  # Clear logs for new step
+        # Emit "Step Start" signal for formatter
+        logger.info(f"Step: {step.name}...") 
+        import time
         import time
         
         action_type = step.action_config.action
@@ -102,10 +116,20 @@ class StepExecutor:
                         self.context[context_key] = result.data[output_name]
                         logger.debug(f"Stored output: {context_key} = {result.data[output_name]}")
             
+            # Log Success
+            if result.success:
+                 logger.info(f"Step: {step.name} Completed")
+            else:
+                 logger.info(f"Step: {step.name} Failed")
+
             return result
             
         except Exception as e:
-            logger.error(f"Error executing step {step.name}: {e}")
+            error_msg = f"Error executing step {step.name}: {e}"
+            self.log(error_msg)
+            # Log Failure explicitly for formatter
+            logger.info(f"Step: {step.name} Failed")
+            
             import traceback
             traceback.print_exc()
             return StepResult(step.name, False, error=str(e))
