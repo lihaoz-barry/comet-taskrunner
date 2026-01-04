@@ -44,7 +44,7 @@ steps:
     config:
       template: "inputs.anchor_template"
       threshold: 0.7
-      timeout: 10.0
+      timeout: 15.0
     outputs:
       - name: "center"
       - name: "coordinates"
@@ -72,7 +72,7 @@ steps:
     config:
       template: "inputs.copy_button_template"
       threshold: "inputs.copy_threshold"
-      timeout: 10.0
+      timeout: 15.0
     outputs:
       - name: "center"
       - name: "coordinates"

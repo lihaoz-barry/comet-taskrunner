@@ -196,9 +196,13 @@ class TaskManager:
         for task_id, task in list(self.tasks.items()):
             if task.status == TaskStatus.RUNNING:
                 # Call task-specific completion check
+                # Call task-specific completion check
                 if task.check_completion():
-                    logger.info(f"Auto-completing task {task_id}")
-                    task.complete()
+                    # Double-check status hasn't changed to final state (e.g. FAILED)
+                    # This prevents overwriting a failure that happened in the thread
+                    if task.status not in [TaskStatus.DONE, TaskStatus.FAILED]:
+                        logger.info(f"Auto-completing task {task_id}")
+                        task.complete()
     
     # ------------------------------------------------------------------------
     # Cleanup
