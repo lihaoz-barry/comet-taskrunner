@@ -80,7 +80,7 @@ steps:
     action: "detect"
     config:
       template: "comet_input_box.png"
-      threshold: 0.7
+      threshold: 0.9
       timeout: 10.0
       retry_interval: 0.5
     outputs:
@@ -148,7 +148,7 @@ steps:
     action: "detect_loop"
     config:
       template: "comet_stop_logo.png"
-      threshold: 0.8
+      threshold: 0.95
       mode: "wait_until_disappears"
       check_interval: 2.0
       timeout: 300.0
@@ -164,6 +164,61 @@ steps:
     config:
       status: "success"
       message: "Task completed successfully"
+
+  # --------------------------------------------------------------------------
+  # Step 10a: Detect copy button
+  # --------------------------------------------------------------------------
+  - id: "step_10a"
+    name: "find_copy_button"
+    display_name: "Find Copy Button"
+    action: "detect"
+    config:
+      template: "comet_copy_button.png"
+      threshold: 0.7
+      timeout: 30.0
+    outputs:
+      - name: "center"
+      - name: "coordinates"
+
+  # --------------------------------------------------------------------------
+  # Step 10b: Click copy button
+  # --------------------------------------------------------------------------
+  - id: "step_10b"
+    name: "click_copy_button"
+    display_name: "Click Copy"
+    action: "click"
+    config:
+      coordinates: "step_10a.center"
+      post_delay: 0.5
+
+  # --------------------------------------------------------------------------
+  # Step 10c: Get clipboard content
+  # --------------------------------------------------------------------------
+  - id: "step_10c"
+    name: "get_result"
+    display_name: "Get Result"
+    action: "clipboard"
+    config:
+      operation: "get"
+    outputs:
+      - name: "content"
+
+  # --------------------------------------------------------------------------
+  # Step 10d: Send result to ntfy.sh
+  # --------------------------------------------------------------------------
+  - id: "step_10d"
+    name: "send_result"
+    display_name: "Send Notification"
+    action: "webhook"
+    config:
+      url: "https://ntfy.sh/comet_tasks"
+      method: "POST"
+      headers:
+        Title: "Comet Task Completed"
+        Tags: "white_check_mark,robot"
+      body_type: "text"
+      body: "step_10c.content"
+      timeout: 10.0
 
   # --------------------------------------------------------------------------
   # Step 11: Close browser window (cleanup for next task)

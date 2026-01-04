@@ -105,12 +105,18 @@ class WebhookAction(BaseAction):
         if isinstance(body, str):
             # Check if it's a reference
             if '.' in body and not body.startswith(('http://', 'https://')):
+                # Check if the full reference exists in context (e.g., "step_10c.content")
+                if body in context:
+                    logger.debug(f"Resolved body reference: {body} -> {context[body][:100] if isinstance(context[body], str) else context[body]}...")
+                    return context[body]
+                
+                # Check for input reference
                 parts = body.split('.', 1)
                 if parts[0] == 'inputs':
                     return context.get('inputs', {}).get(parts[1], body)
-                elif parts[0] in context:
-                    # Step output reference
-                    return context.get(body, body)
+                
+                # If not found, log warning and return original
+                logger.warning(f"Could not resolve body reference: {body}")
             return body
         elif isinstance(body, dict):
             return {k: self._resolve_body(v, context) for k, v in body.items()}
