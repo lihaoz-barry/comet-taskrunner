@@ -13,6 +13,7 @@ from .completion_action import CompletionAction
 from .close_window_action import CloseWindowAction
 from .clipboard_action import ClipboardAction
 from .screenshot_action import ScreenshotAction
+from .webhook_action import WebhookAction
 
 # Register actions
 ActionRegistry.register(WaitAction)
@@ -26,3 +27,4 @@ ActionRegistry.register(CompletionAction)
 ActionRegistry.register(CloseWindowAction)
 ActionRegistry.register(ClipboardAction)
 ActionRegistry.register(ScreenshotAction)
+ActionRegistry.register(WebhookAction)
