@@ -107,13 +107,16 @@ class ConfigurableTask(BaseTask):
             }
         }
 
-    def get_automation_progress(self) -> Dict[str, Any]:
-        """
-        Get progress in format expected by StatusOverlay.
-        """
+        # Get current step name
+        step_name = "Wait..."
+        if 0 < self.current_step_index <= len(self.workflow_config.steps):
+            step = self.workflow_config.steps[self.current_step_index - 1]
+            step_name = step.display_name or step.name
+
         return {
             'current_step': self.current_step_index,
             'total_steps': self.total_steps,
+            'current_step_name': step_name,
             'completed_steps': len(self.step_results),
             'progress_percent': int((len(self.step_results) / self.total_steps) * 100) if self.total_steps > 0 else 0
         }

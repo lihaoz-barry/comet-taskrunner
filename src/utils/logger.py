@@ -35,14 +35,22 @@ class CustomFormatter(logging.Formatter):
             content = f"{color}│ {msg:<58} │{RESET}"
             bottom = f"{color}└{'─'*60}┘{RESET}"
             return f"\n{border}\n{timestamp} {content}\n{bottom}"
+
+        # 2b. Box for Step Start (Cyan)
+        if "Executing step" in msg:
+            color = CYAN
+            border = f"{color}┌{'─'*60}┐{RESET}"
+            content = f"{color}│ ▶ {msg:<56} │{RESET}"
+            bottom = f"{color}└{'─'*60}┘{RESET}"
+            return f"\n{border}\n{timestamp} {content}\n{bottom}"
             
         # 3. Step Logs (Style 1)
-        if "Step:" in msg or "Executing step" in msg:
+        if "Step:" in msg:
             if "Completed" in msg or "Success" in msg:
                 return f"{timestamp} {GREEN}✔{RESET}  {msg}"
             elif "Failed" in msg or "Error" in msg:
                 return f"{timestamp} {RED}✖{RESET}  {msg}"
-            elif "Executing" in msg or "..." in msg:
+            elif "..." in msg:
                 return f"{timestamp} {YELLOW}▶{RESET}  {msg}"
                 
         # 4. Standard Info (Minimalist)
