@@ -33,9 +33,13 @@ import time
 from functools import wraps
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv  # Load .env file
+from colorama import init as colorama_init
 
 # Load environment variables from .env file (if present)
 load_dotenv()
+
+# Enable ANSI colors and emoji support in Windows console (for exe builds)
+colorama_init(autoreset=True)
 
 # Import task components (independent, reusable)
 # Import task components (independent, reusable)

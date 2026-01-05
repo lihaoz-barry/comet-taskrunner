@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 REM ============================================================
 REM Build backend.exe using PyInstaller
 REM This creates a standalone executable with all dependencies
