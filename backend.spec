@@ -36,6 +36,7 @@ a = Analysis(
         'flask',
         'flask.json',
         'dotenv',  # python-dotenv
+        'colorama',  # For ANSI color support in Windows console
         'psutil',
         'cv2',  # opencv-python
         'numpy',
