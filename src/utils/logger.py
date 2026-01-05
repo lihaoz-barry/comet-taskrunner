@@ -55,7 +55,7 @@ class CustomFormatter(logging.Formatter):
                 
         # 4. Standard Info (Minimalist)
         if record.levelno == logging.INFO:
-            return f"{timestamp} {BLUE}ℹ{RESET}  {msg}"
+            return f"{timestamp} {BLUE}!{RESET}  {msg}"
         elif record.levelno == logging.WARNING:
             return f"{timestamp} {YELLOW}⚠  {msg}{RESET}"
         if record.levelno == logging.ERROR:
