@@ -1,9 +1,10 @@
 """
 Tray Module for Comet Task Runner
 
-Provides system tray application with background Flask service.
+This module provides system tray functionality for running the backend
+as a background service with user-friendly controls.
 """
 
-from .tray_controller import TrayController
+from .icon_tray import main, show_logs, exit_app
 
-__all__ = ['TrayController']
+__all__ = ['main', 'show_logs', 'exit_app']
