@@ -1,4 +1,4 @@
-name: Build Backend Executable
+name: Build Executables
 
 on:
   pull_request:
@@ -29,45 +29,63 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Build backend.exe with PyInstaller
-        run: pyinstaller backend.spec
+      - name: Build backend.exe (console mode)
+        run: pyinstaller backend.spec --noconfirm
+
+      - name: Build CometTaskRunnerTray.exe (tray mode)
+        run: pyinstaller CometTaskRunnerTray.spec --noconfirm
 
       - name: Verify build output
         run: |
+          $success = $true
+          
           if (Test-Path "dist/backend.exe") {
-            Write-Host "✓ Build successful: dist/backend.exe"
             $fileSize = (Get-Item "dist/backend.exe").Length / 1MB
-            Write-Host "  File size: $([math]::Round($fileSize, 2)) MB"
+            Write-Host "✓ backend.exe: $([math]::Round($fileSize, 2)) MB"
           } else {
-            Write-Host "✗ Build failed: dist/backend.exe not found"
-            exit 1
+            Write-Host "✗ backend.exe not found"
+            $success = $false
           }
+          
+          if (Test-Path "dist/CometTaskRunnerTray.exe") {
+            $fileSize = (Get-Item "dist/CometTaskRunnerTray.exe").Length / 1MB
+            Write-Host "✓ CometTaskRunnerTray.exe: $([math]::Round($fileSize, 2)) MB"
+          } else {
+            Write-Host "✗ CometTaskRunnerTray.exe not found"
+            $success = $false
+          }
+          
+          if (-not $success) { exit 1 }
 
       - name: Determine artifact name
         id: artifact-name
         run: |
           if ("${{ github.event_name }}" -eq "pull_request") {
-            $artifactName = "backend-exe-pr-${{ github.event.pull_request.number }}"
+            $artifactName = "comet-taskrunner-pr-${{ github.event.pull_request.number }}"
           } elseif ("${{ github.event_name }}" -eq "release") {
-            $artifactName = "backend-exe-${{ github.event.release.tag_name }}"
+            $artifactName = "comet-taskrunner-${{ github.event.release.tag_name }}"
           } else {
-            $artifactName = "backend-exe-manual-${{ github.run_id }}"
+            $artifactName = "comet-taskrunner-manual-${{ github.run_id }}"
           }
           echo "name=$artifactName" >> $env:GITHUB_OUTPUT
           echo "Artifact name: $artifactName"
 
-      - name: Upload backend.exe as artifact
+      - name: Upload executables as artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.artifact-name.outputs.name }}
-          path: dist/backend.exe
+          path: |
+            dist/backend.exe
+            dist/CometTaskRunnerTray.exe
           retention-days: 30
 
-      - name: Upload backend.exe to Release
+      - name: Upload to Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v1
         with:
-          files: dist/backend.exe
+          files: |
+            dist/backend.exe
+            dist/CometTaskRunnerTray.exe
           tag_name: ${{ github.event.release.tag_name }}
 
       - name: Post PR comment with download links
