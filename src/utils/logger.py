@@ -70,6 +70,8 @@ class CustomFormatter(logging.Formatter):
 
 def setup_logging():
     """Configure root logger with custom formatter and filters"""
+    import os
+    
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.INFO)
     
@@ -77,10 +79,31 @@ def setup_logging():
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
         
-    # Console Handler
+    # Console Handler (with colors)
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(CustomFormatter())
     root_logger.addHandler(console_handler)
+    
+    # File Handler (for tray app "Show Logs" feature)
+    # Determine log directory based on execution context
+    if getattr(sys, 'frozen', False):
+        # Running as EXE
+        log_dir = os.path.join(os.path.dirname(sys.executable), "logs")
+    else:
+        # Running as script
+        log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "logs")
+    
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, "comet.log")
+    
+    # Use CustomFormatter for file too (PowerShell supports ANSI colors)
+    file_handler = logging.FileHandler(log_file, encoding='utf-8')
+    file_handler.setFormatter(CustomFormatter())  # Same colorful format!
+    file_handler.setLevel(logging.INFO)
+    root_logger.addHandler(file_handler)
+    
+    # Log the file location for debugging
+    root_logger.info(f"Logging to file: {log_file}")
     
     # Filter Noise
     logging.getLogger("werkzeug").setLevel(logging.ERROR) # Hide HTTP 200s
@@ -89,3 +112,4 @@ def setup_logging():
     logging.getLogger("automation.window_manager").setLevel(logging.WARNING) # Hide noisy window checks
 
     return root_logger
+

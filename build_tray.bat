@@ -1,56 +1,58 @@
 @echo off
 setlocal enabledelayedexpansion
 REM ============================================================
-REM Build backend.exe using PyInstaller
-REM This creates a standalone executable with all dependencies
+REM Build CometTaskRunnerTray.exe using PyInstaller
+REM Creates a standalone tray application (no console window)
 REM ============================================================
 
 echo.
 echo ============================================================
-echo  Building backend.exe with PyInstaller
+echo  Building CometTaskRunnerTray.exe with PyInstaller
 echo ============================================================
 echo.
 
-if exist "dist\backend.exe" (
-    echo [INFO] Removing old backend.exe...
-    del /q dist\backend.exe
+if exist "dist\CometTaskRunnerTray.exe" (
+    echo [INFO] Removing old CometTaskRunnerTray.exe...
+    del /q dist\CometTaskRunnerTray.exe
 )
 
 echo.
 echo [INFO] Starting PyInstaller build...
 echo.
 
-REM Run PyInstaller with spec file
-pyinstaller backend.spec --noconfirm
+REM Run PyInstaller with tray spec file
+pyinstaller CometTaskRunnerTray.spec --noconfirm
 
 echo.
 REM Check if build output exists (more reliable than errorlevel)
-if exist "dist\backend.exe" (
+if exist "dist\CometTaskRunnerTray.exe" (
     echo ============================================================
     echo  BUILD SUCCESSFUL!
     echo ============================================================
     echo.
-    echo  Output: dist\backend.exe
+    echo  Output: dist\CometTaskRunnerTray.exe
     
     REM Show file size
-    for %%A in (dist\backend.exe) do (
+    for %%A in (dist\CometTaskRunnerTray.exe) do (
         set size=%%~zA
         set /a sizeMB=!size! / 1048576
         echo  Size: !sizeMB! MB
     )
     
     echo.
-    echo  Next steps:
-    echo  1. Test: dist\backend.exe
-    echo  2. Check terminal output for errors
-    echo  3. Verify Flask starts on port 5000
+    echo  Features:
+    echo  - System tray icon (no console window)
+    echo  - Background Flask server
+    echo  - Real-time log streaming (Show Logs)
+    echo.
+    echo  To run: dist\CometTaskRunnerTray.exe
     echo.
 ) else (
     echo ============================================================
     echo  BUILD FAILED!
     echo ============================================================
     echo.
-    echo  Error: dist\backend.exe not found
+    echo  Error: dist\CometTaskRunnerTray.exe not found
     echo  Check the PyInstaller output above for errors
     echo.
 )

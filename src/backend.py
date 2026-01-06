@@ -593,9 +593,20 @@ def start_task_monitor():
 # MAIN APPLICATION ENTRY
 # ============================================================================
 
-if __name__ == '__main__':
+def run_server(local_only: bool = False):
+    """
+    Start the Flask backend server.
+    
+    This function is designed to be called from:
+    1. Direct execution: python backend.py
+    2. Tray application: import backend; backend.run_server()
+    
+    Args:
+        local_only: If True, bind to 127.0.0.1 only (no API key required)
+    """
     import atexit
     from utils.cleanup import cleanup_temp_files
+    global task_queue
 
     # Register cleanup on normal exit
     atexit.register(cleanup_temp_files)
@@ -609,11 +620,8 @@ if __name__ == '__main__':
     try:
         from overlay import StatusOverlay, OverlayConfig
         logger.info("✓ Overlay module loaded successfully")
-        logger.info("  - StatusOverlay available")
-        logger.info("  - OverlayConfig available")
     except ImportError as e:
         logger.warning(f"⚠ Overlay module not available: {e}")
-        logger.warning("  Tkinter overlay features will be disabled")
 
     # Check keyboard module availability
     try:
@@ -622,51 +630,63 @@ if __name__ == '__main__':
     except ImportError:
         logger.warning("⚠ Keyboard module not available - ESC cancellation disabled")
     
-    # Security Check: Ensure API Key is set before exposing to 0.0.0.0
+    # Security Check
     api_key = os.environ.get('COMET_API_KEY')
-    if not api_key:
-        print("\n" + "!" * 80)
-        print("CRITICAL SECURITY ERROR: COMET_API_KEY environment variable is not set!")
-        print("!" * 80)
-        print("\nTo securely expose the server to the network, you MUST set an API Key.")
-        print("\n[Option 1] Temporary (Current Session):")
-        print("  set COMET_API_KEY=my-secret-password-123")
-        print("\n[Option 2] Permanent (User Environment):")
-        print("  setx COMET_API_KEY \"my-secret-password-123\"")
-        print("\n[Option 3] .env file (Recommended for Dev):")
-        print("  Create a .env file with: COMET_API_KEY=my-secret-password-123")
-        print("\n" + "!" * 80 + "\n")
-        input("Press Enter to exit...")  # Keep window open to read error
-        sys.exit(1)
-        
-    logger.info(f"✓ Security: API Key detected (Length: {len(api_key)})")
     
-    # Initialize TaskQueue with comet_path
-    # Note: task_queue is already declared at module level (line 57)
+    if local_only:
+        # Tray mode: allow local-only without API key
+        host = '127.0.0.1'
+        logger.info("Running in LOCAL-ONLY mode (no API key required)")
+    elif not api_key:
+        # Interactive mode: require API key
+        logger.error("COMET_API_KEY not set!")
+        if __name__ == '__main__':
+            print("\n" + "!" * 80)
+            print("CRITICAL: COMET_API_KEY environment variable is not set!")
+            print("!" * 80)
+            input("Press Enter to exit...")
+            sys.exit(1)
+        else:
+            # Called from tray, fallback to local-only
+            host = '127.0.0.1'
+            logger.warning("Falling back to localhost-only mode")
+    else:
+        host = '0.0.0.0'
+        logger.info(f"✓ API Key detected (Length: {len(api_key)})")
+    
+    # Initialize TaskQueue
     comet_path = get_comet_path()
     if comet_path:
         task_queue = TaskQueue(comet_path)
-        logger.info(f"✓ TaskQueue initialized with Comet path: {comet_path}")
+        logger.info(f"✓ TaskQueue initialized")
     else:
-        logger.warning("⚠ Comet browser not found, TaskQueue not initialized")
+        logger.warning("⚠ Comet browser not found")
     
-    logger.info("URL Task API: POST /execute/url")
-    logger.info("AI Task API:  POST /execute/ai")
-    logger.info("Status API:   GET /status/<task_id>")
-    logger.info("Manager API:  GET /manager/status")
+    logger.info("API Endpoints ready:")
+    logger.info("  POST /execute/url")
+    logger.info("  POST /execute/ai")
+    logger.info("  GET  /status/<task_id>")
+    logger.info("  GET  /manager/status")
     logger.info("=" * 60)
     
     # Start background monitoring thread
     start_task_monitor()
     
     try:
-        # Start Flask server on 0.0.0.0 (All interfaces)
-        logger.info("Server listening on 0.0.0.0:5000 (Local + Remote)")
-        app.run(host='0.0.0.0', port=5000, debug=False)
+        logger.info(f"Server listening on {host}:5000")
+        app.run(host=host, port=5000, debug=False, use_reloader=False)
     except KeyboardInterrupt:
-        print("\n")
+        pass
+    except Exception as e:
+        logger.error(f"Server error: {e}")
+    finally:
         logger.info("Backend shutting down...")
         if task_queue:
             task_queue.shutdown()
         cleanup_temp_files()
         logger.info("Goodbye!")
+
+
+if __name__ == '__main__':
+    run_server()
+
