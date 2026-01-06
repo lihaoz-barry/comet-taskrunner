@@ -96,14 +96,9 @@ def setup_logging():
     os.makedirs(log_dir, exist_ok=True)
     log_file = os.path.join(log_dir, "comet.log")
     
-    # Simple formatter for file (no ANSI colors)
-    file_formatter = logging.Formatter(
-        '%(asctime)s [%(levelname)s] %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    
+    # Use CustomFormatter for file too (PowerShell supports ANSI colors)
     file_handler = logging.FileHandler(log_file, encoding='utf-8')
-    file_handler.setFormatter(file_formatter)
+    file_handler.setFormatter(CustomFormatter())  # Same colorful format!
     file_handler.setLevel(logging.INFO)
     root_logger.addHandler(file_handler)
     
