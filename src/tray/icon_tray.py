@@ -66,6 +66,22 @@ def get_log_path() -> str:
     return log_path
 
 
+def get_network_mode() -> bool:
+    """
+    Determine if the server should run in local-only mode.
+    
+    Reads from COMET_LOCAL_ONLY environment variable.
+    
+    Returns:
+        True if local-only mode (127.0.0.1), False if network mode (0.0.0.0).
+        Default: False (network access enabled for LAN compatibility).
+    """
+    local_only = os.environ.get('COMET_LOCAL_ONLY', 'false').lower() == 'true'
+    mode_str = 'Local Only (127.0.0.1)' if local_only else 'LAN Access (0.0.0.0)'
+    logger.info(f"Network mode: {mode_str}")
+    return local_only
+
+
 def show_logs(icon, item):
     """
     Open the log file in a real-time streaming terminal.
@@ -152,7 +168,9 @@ def main():
     logger.info("=" * 60)
     
     # 1. Start Backend in a background thread
-    backend_thread = threading.Thread(target=run_server, args=(True,), daemon=True)
+    # Use get_network_mode() to determine local-only vs network access
+    # Default: network access enabled (local_only=False) for LAN compatibility
+    backend_thread = threading.Thread(target=run_server, args=(get_network_mode(),), daemon=True)
     backend_thread.start()
     logger.info("Backend thread started")
     
