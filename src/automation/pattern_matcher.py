@@ -31,7 +31,7 @@ class PatternMatcher:
         window_rect: Tuple[int, int, int, int],
         threshold: float = 0.3,
         save_debug: bool = False
-    ) -> Optional[Tuple[int, int]]:
+    ) -> Optional[Tuple[Tuple[int, int], Tuple[int, int, int, int], float]]:
         """
         Find template pattern in screenshot.
         
@@ -43,7 +43,11 @@ class PatternMatcher:
             save_debug: If True, save a debug image with the match highlighted
             
         Returns:
-            (x, y) screen coordinates of pattern center, or None
+            Tuple of ((center_x, center_y), (match_x, match_y, width, height), confidence)
+            or None if no match found
+            - center coords: Screen coordinates of pattern center
+            - match box: Position and size in screenshot (x, y, w, h)
+            - confidence: Match confidence score (0.0-1.0)
         """
         logger.info(f"Starting pattern matching: template={Path(template_path).name}, threshold={threshold}")
         
@@ -114,7 +118,9 @@ class PatternMatcher:
                 except Exception as e:
                     logger.warning(f"Failed to save debug image: {e}")
             
-            return (center_x, center_y)
+            # Return tuple: (center_coords, match_box, confidence)
+            # match_box format: (x, y, width, height) in screenshot coordinates
+            return ((center_x, center_y), (match_x, match_y, template_w, template_h), max_val)
             
         except Exception as e:
             logger.error(f"Pattern matching failed: {e}")

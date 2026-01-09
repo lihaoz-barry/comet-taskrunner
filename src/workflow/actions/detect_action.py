@@ -91,7 +91,7 @@ class DetectAction(BaseAction):
                 # 3. Match
                 debug_mode = config.get('debug', True) # Default to True for now as per user request
                 
-                coordinates = PatternMatcher.find_pattern(
+                result = PatternMatcher.find_pattern(
                     str(screenshot_path),
                     str(template_path),
                     window_rect,
@@ -99,10 +99,35 @@ class DetectAction(BaseAction):
                     save_debug=debug_mode
                 )
                 
-                if coordinates:
+                if result:
+                    # Unpack new return format: (center_coords, match_box, confidence)
+                    center_coords, match_box, confidence = result
+                    
+                    # Calculate click position based on configuration
+                    from automation.click_position import ClickPosition
+                    
+                    click_pos_config = config.get('click_position', 'center')
+                    
+                    try:
+                        click_coords = ClickPosition.calculate(
+                            match_box=match_box,
+                            window_rect=window_rect,
+                            position_config=click_pos_config
+                        )
+                        
+                        logger.info(f"Click position calculated: {click_coords} "
+                                   f"(config: {click_pos_config}, confidence: {confidence:.4f})")
+                        
+                    except Exception as e:
+                        logger.warning(f"Failed to calculate click position: {e}, using center")
+                        click_coords = center_coords
+                    
                     return StepResult(self.action_type, True, data={
-                        'coordinates': coordinates,
-                        'center': coordinates,
+                        'coordinates': click_coords,  # 点击坐标 (可能调整过)
+                        'center': center_coords,      # 原始中心点
+                        'match_box': match_box,       # 匹配框 (x, y, w, h)
+                        'confidence': confidence,     # 匹配度
+                        'click_position_config': click_pos_config,  # 使用的配置
                         'window_rect': window_rect,
                         'hwnd': hwnd
                     })
