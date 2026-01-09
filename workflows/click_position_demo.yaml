@@ -1,0 +1,150 @@
+name: click_position_demo
+description: |
+  演示可配置点击位置功能
+  展示如何使用 click_position 在匹配框的不同位置点击
+
+inputs:
+  - name: instruction
+    type: string
+    required: false
+    default: "测试点击位置功能"
+
+steps:
+  # 示例 1: 默认行为 - 点击中心
+  - id: demo_center
+    name: "示例1: 中心点击 (默认)"
+    action: detect
+    config:
+      template: button.png
+      threshold: 0.8
+      # click_position 未指定，默认为 'center'
+    on_error: skip
+    
+  - id: click_center
+    action: click
+    on_error: skip
+    
+  # 示例 2: 预定义位置 - 左上角
+  - id: demo_top_left
+    name: "示例2: 左上角点击"
+    action: detect
+    config:
+      template: dropdown_button.png
+      threshold: 0.8
+      click_position: top-left  # 预定义位置
+    on_error: skip
+    
+  - id: click_top_left
+    action: click
+    on_error: skip
+  
+  # 示例 3: 预定义位置 - 右下角
+  - id: demo_bottom_right
+    name: "示例3: 右下角点击"
+    action: detect
+    config:
+      template: resize_handle.png
+      threshold: 0.75
+      click_position: bottom-right
+    on_error: skip
+    
+  - id: click_bottom_right
+    action: click
+    on_error: skip
+  
+  # 示例 4: 百分比配置 - 精确定位
+  - id: demo_percentage
+    name: "示例4: 百分比定位"
+    action: detect
+    config:
+      template: search_box.png
+      threshold: 0.80
+      click_position:
+        x: "10%"   # 从左边10%处
+        y: "50%"   # 垂直中间
+    on_error: skip
+    
+  - id: click_percentage
+    action: click
+    on_error: skip
+  
+  # 示例 5: 数值百分比 (0.0-1.0)
+  - id: demo_ratio
+    name: "示例5: 比例值定位"
+    action: detect
+    config:
+      template: slider.png
+      threshold: 0.75
+      click_position:
+        x: 0.25  # 25% from left
+        y: 0.5   # 50% from top (middle)
+    on_error: skip
+    
+  - id: click_ratio
+    action: click
+    on_error: skip
+  
+  # 示例 6: 像素偏移 - 相对中心
+  - id: demo_offset
+    name: "示例6: 像素偏移"
+    action: detect
+    config:
+      template: large_menu.png
+      threshold: 0.70
+      click_position:
+        x_offset: -50  # 中心向左50像素
+        y_offset: 20   # 中心向下20像素
+    on_error: skip
+    
+  - id: click_offset
+    action: click
+    on_error: skip
+
+  # 示例 7: 实际应用 - 点击下拉箭头
+  - id: find_dropdown
+    name: "实例: 点击下拉箭头"
+    action: detect
+    display_name: "查找下拉菜单"
+    config:
+      template: dropdown_arrow.png
+      threshold: 0.85
+      click_position: top-right  # 箭头通常在右上
+      timeout: 5.0
+    on_error: skip
+    
+  - id: open_dropdown
+    action: click
+    on_error: skip
+    
+  # 示例 8: 实际应用 - 输入框左侧点击
+  - id: find_input_box
+    name: "实例: 输入框点击"  
+    action: detect
+    display_name: "查找输入框"
+    config:
+      template: text_input.png
+      threshold: 0.80
+      click_position:
+        x: "5%"   # 靠左边一点，避免占位符文字
+        y: "50%"  # 垂直居中
+      timeout: 5.0
+    on_error: skip
+    
+  - id: click_input
+    action: click
+    on_error: skip
+
+# 可用的预定义位置:
+# - top-left, top-center, top-right
+# - middle-left, center, middle-right  
+# - bottom-left, bottom-center, bottom-right
+
+# 百分比配置格式:
+# click_position:
+#   x: "10%"  # 字符串格式
+#   y: 0.5    # 数值格式 (0.0-1.0)
+
+# 像素偏移配置格式:
+# click_position:
+#   x_offset: -50  # 负值向左，正值向右
+#   y_offset: 20   # 负值向上，正值向下

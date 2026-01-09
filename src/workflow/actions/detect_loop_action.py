@@ -79,7 +79,7 @@ class DetectLoopAction(BaseAction):
                 
                 # 3. Match
                 debug_mode = True # Always debug for now per user request
-                coordinates = PatternMatcher.find_pattern(
+                result = PatternMatcher.find_pattern(
                     str(screenshot_path),
                     str(template_path),
                     window_rect,
@@ -89,16 +89,24 @@ class DetectLoopAction(BaseAction):
                 
                 # 4. Check condition
                 if mode == 'wait_until_disappears':
-                    if not coordinates:
+                    if not result:
                          # Disappeared!
                         return StepResult(self.action_type, True, data={'attempts': attempt, 'status': 'disappeared'})
                     else:
-                        logger.debug(f"Template still visible at {coordinates}")
+                        # Unpack result for logging
+                        center_coords, match_box, confidence = result
+                        logger.debug(f"Template still visible at {center_coords} (confidence: {confidence:.4f})")
                         
                 elif mode == 'wait_until_appears':
-                    if coordinates:
-                         # Appeared!
-                        return StepResult(self.action_type, True, data={'attempts': attempt, 'coordinates': coordinates})
+                    if result:
+                        # Appeared!
+                        center_coords, match_box, confidence = result
+                        return StepResult(self.action_type, True, data={
+                            'attempts': attempt,
+                            'coordinates': center_coords,
+                            'match_box': match_box,
+                            'confidence': confidence
+                        })
                 
                 # Clean up screenshot
                 # os.remove(screenshot_path)

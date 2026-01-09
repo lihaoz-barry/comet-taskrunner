@@ -6,7 +6,7 @@ This directory contains the complete API specification and testing resources for
 
 ## 📁 Files
 
-### 1. `Comet_TaskRunner_Collection.postman_collection.json`
+### 1. `CometTaskRunner_API.postman_collection.json`
 Complete Postman Collection with all API endpoints organized into logical folders:
 
 - **Health & Status** - Server health checks and queue monitoring
@@ -24,11 +24,50 @@ Complete Postman Collection with all API endpoints organized into logical folder
 - **Task Status Monitoring** - Track task execution progress
 - **Manual Callbacks** - Manual task status overrides
 
-### 2. `Comet_TaskRunner_Local.postman_environment.json`
+### 2. `CometTaskRunner_Local.postman_environment.json`
 Environment configuration for local development with pre-configured variables:
 - `base_url`: http://127.0.0.1:5000
+- `api_key`: Empty (localhost doesn't require authentication)
 - `task_id`: Auto-populated by test scripts
 - `last_status`: Track last task status
+
+### 3. `CometTaskRunner_Remote.postman_environment.json`
+Environment configuration for remote/LAN access with authentication:
+- `base_url`: http://YOUR_SERVER_IP:5000 (update with your server IP)
+- `api_key`: my-secret-password-123 (configured API key)
+- `task_id`: Auto-populated by test scripts
+- `last_status`: Track last task status
+
+## 🔐 Authentication
+
+### Local Access (Localhost)
+When testing locally (127.0.0.1), **no authentication is required**. The backend automatically exempts localhost requests from API key validation.
+
+**Setup:**
+1. Use `CometTaskRunner_Local.postman_environment.json`
+2. The `api_key` variable is disabled by default
+3. All requests work without the `X-API-Key` header
+
+### Remote Access (LAN/Network)
+When accessing the backend from another machine on your network, **API key authentication is required**.
+
+**Setup:**
+1. Use `CometTaskRunner_Remote.postman_environment.json`
+2. Update `base_url` to your server's IP (e.g., `http://192.168.1.100:5000`)
+3. Set `api_key` to `my-secret-password-123` (or your configured key)
+4. All protected endpoints automatically include the `X-API-Key` header
+
+**Protected Endpoints:**
+- `POST /execute/url`
+- `POST /execute/ai_assistant`
+- All `/execute/*` endpoints
+
+**Public Endpoints (no auth required):**
+- `GET /health`
+- `GET /status/<task_id>`
+- `GET /manager/status`
+- `GET /jobs`
+
 
 ## 🚀 Quick Start
 
@@ -38,16 +77,16 @@ Environment configuration for local development with pre-configured variables:
 
 2. **Import Collection**
    - Click **Import** button (top left)
-   - Select `Comet_TaskRunner_Collection.postman_collection.json`
+   - Select `CometTaskRunner_API.postman_collection.json`
    - Click **Import**
 
 3. **Import Environment**
    - Click **Import** again
-   - Select `Comet_TaskRunner_Local.postman_environment.json`
+   - Select `CometTaskRunner_Local.postman_environment.json`
    - Click **Import**
 
 4. **Select Environment**
-   - In the top-right dropdown, select **"Comet TaskRunner - Local"**
+   - In the top-right dropdown, select **"CometTaskRunner - Local"**
 
 5. **Start Testing!**
    - Ensure your backend server is running (`python src/backend.py`)
@@ -65,7 +104,7 @@ Environment configuration for local development with pre-configured variables:
 
 2. **Submit AI Task**
    ```
-   POST /execute/ai
+   POST /execute/ai_assistant
    Body: { "instruction": "/1mu3" }
    ```
    The test script automatically saves the `task_id`
@@ -129,8 +168,8 @@ npm install -g newman
 
 Run collection from command line:
 ```bash
-newman run Comet_TaskRunner_Collection.postman_collection.json \
-  -e Comet_TaskRunner_Local.postman_environment.json \
+newman run CometTaskRunner_API.postman_collection.json \
+  -e CometTaskRunner_Local.postman_environment.json \
   --reporters cli,json
 ```
 
@@ -220,7 +259,7 @@ http://127.0.0.1:5000
 |--------|----------|-------------|
 | GET | `/health` | Health check |
 | POST | `/execute/url` | Execute URL task |
-| POST | `/execute/ai` | Execute AI task |
+| POST | `/execute/ai_assistant` | Execute AI Assistant task |
 | GET | `/status/<task_id>` | Get task status |
 | GET | `/manager/status` | Get queue status |
 | GET | `/jobs` | Get all tasks |
