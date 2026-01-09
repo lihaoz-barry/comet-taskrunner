@@ -268,13 +268,12 @@
 							"raw": "{\n    \"instruction\": \"/1mu3\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/execute/ai",
+							"raw": "{{base_url}}/execute/ai_assistant",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
-								"execute",
-								"ai"
+								"execute", "ai_assistant"
 							]
 						},
 						"description": "Execute AI task with /1mu3 prompt for 1688.com product analysis."
@@ -326,13 +325,12 @@
 							"raw": "{\n    \"instruction\": \"/ikea\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/execute/ai",
+							"raw": "{{base_url}}/execute/ai_assistant",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
-								"execute",
-								"ai"
+								"execute", "ai_assistant"
 							]
 						},
 						"description": "Execute AI task with /ikea prompt for IKEA product information."
@@ -379,13 +377,12 @@
 							"raw": "{\n    \"instruction\": \"/amazon\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/execute/ai",
+							"raw": "{{base_url}}/execute/ai_assistant",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
-								"execute",
-								"ai"
+								"execute", "ai_assistant"
 							]
 						},
 						"description": "Execute AI task with /amazon prompt for Amazon product search."
@@ -438,13 +435,12 @@
 							"raw": "{\n    \"instruction\": \"Please summarize the main content of this webpage in 3-5 bullet points.\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/execute/ai",
+							"raw": "{{base_url}}/execute/ai_assistant",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
-								"execute",
-								"ai"
+								"execute", "ai_assistant"
 							]
 						},
 						"description": "Ask AI to summarize webpage content - suitable for AI browser automation."
@@ -491,13 +487,12 @@
 							"raw": "{\n    \"instruction\": \"Extract all product prices from this page and list them in a table format.\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/execute/ai",
+							"raw": "{{base_url}}/execute/ai_assistant",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
-								"execute",
-								"ai"
+								"execute", "ai_assistant"
 							]
 						},
 						"description": "Ask AI to extract specific data (prices) from the current webpage."
@@ -544,13 +539,12 @@
 							"raw": "{\n    \"instruction\": \"Analyze the images on this page and describe what products are shown.\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/execute/ai",
+							"raw": "{{base_url}}/execute/ai_assistant",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
-								"execute",
-								"ai"
+								"execute", "ai_assistant"
 							]
 						},
 						"description": "Ask AI to analyze images on the current page - tests multimodal capabilities."
@@ -597,13 +591,12 @@
 							"raw": "{\n    \"instruction\": \"Translate the main heading of this page to English.\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/execute/ai",
+							"raw": "{{base_url}}/execute/ai_assistant",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
-								"execute",
-								"ai"
+								"execute", "ai_assistant"
 							]
 						},
 						"description": "Ask AI to translate content - useful for international e-commerce."
@@ -650,13 +643,12 @@
 							"raw": "{\n    \"instruction\": \"Compare the features of the top 3 products on this page and create a comparison table.\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/execute/ai",
+							"raw": "{{base_url}}/execute/ai_assistant",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
-								"execute",
-								"ai"
+								"execute", "ai_assistant"
 							]
 						},
 						"description": "Ask AI to perform comparative analysis - great for product research."
@@ -836,3 +828,4 @@
 		}
 	]
 }
+
