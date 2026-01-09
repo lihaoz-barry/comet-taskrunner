@@ -1,5 +1,6 @@
 import logging
 import base64
+import tempfile
 from pathlib import Path
 from typing import Dict, Any
 from datetime import datetime
@@ -67,11 +68,14 @@ class ScreenshotAction(BaseAction):
                 # Default save location
                 import sys
                 if getattr(sys, 'frozen', False):
-                    base_dir = Path(sys.executable).parent
+                    # Use temp directory for exe to avoid permission issues
+                    base_dir = Path(tempfile.gettempdir()) / "comet_taskrunner"
                 else:
                     base_dir = Path(__file__).parent.parent.parent.parent
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                save_path = str(base_dir / "screenshots" / f"capture_{timestamp}.png")
+                screenshots_dir = base_dir / "screenshots"
+                screenshots_dir.mkdir(parents=True, exist_ok=True)  # Ensure directory exists
+                save_path = str(screenshots_dir / f"capture_{timestamp}.png")
             
             # Capture screenshot
             screenshot = ScreenshotCapture.capture_window(rect, save_path)

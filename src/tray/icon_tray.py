@@ -123,6 +123,36 @@ def open_health_check(icon, item):
     webbrowser.open("http://localhost:5000/health")
 
 
+def toggle_autostart(icon, item):
+    """
+    Toggle Windows autostart and log the result.
+    
+    This function enables/disables the application from starting
+    automatically when Windows boots up.
+    """
+    from tray.autostart import toggle_autostart as do_toggle, is_autostart_enabled
+    
+    success = do_toggle()
+    
+    if success:
+        status = "已启用" if is_autostart_enabled() else "已禁用"
+        logger.info(f"Windows 自启动功能 {status}")
+        
+        # Optional: Show Windows notification (requires additional setup)
+        # try:
+        #     icon.notify(f"自启动功能{status}", "Comet Task Runner")
+        # except:
+        #     pass
+    else:
+        logger.error("自启动设置失败，请检查日志获取详细信息")
+
+
+def check_autostart(item):
+    """Check if autostart is enabled (for menu checkmark)."""
+    from tray.autostart import is_autostart_enabled
+    return is_autostart_enabled()
+
+
 def exit_app(icon, item):
     """Gracefully shutdown and exit."""
     logger.info("Exit requested from tray menu")
@@ -180,6 +210,17 @@ def main():
     menu = pystray.Menu(
         pystray.MenuItem("Open Health Check", open_health_check),
         pystray.MenuItem("Show Logs", show_logs),
+        pystray.Menu.SEPARATOR,
+        pystray.MenuItem(
+            "Settings",
+            pystray.Menu(
+                pystray.MenuItem(
+                    "Start with Windows",
+                    toggle_autostart,
+                    checked=check_autostart
+                ),
+            )
+        ),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Exit", exit_app),
     )
