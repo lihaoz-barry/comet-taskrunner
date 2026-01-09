@@ -289,19 +289,32 @@ class TaskQueue:
                 # Check if current task completed
                 if self.current_task:
                     if self.current_task.check_completion():
-                        logger.info(f"✅ Task {self.current_task.task_id} completed")
-                        self.current_task.complete()
+                        # Task has finished, but check if it succeeded or failed
+                        if self.current_task.status == TaskStatus.FAILED:
+                            logger.error(f"✖ Task {self.current_task.task_id} failed: {self.current_task.error_message}")
+                        else:
+                            logger.info(f"✅ Task {self.current_task.task_id} completed")
+                            self.current_task.complete()
 
-                        # Show completion in overlay before hiding
+                        # Show completion/failure in overlay before hiding
                         if self.overlay and self.overlay_task_id == self.current_task.task_id:
                             try:
-                                self.overlay.update_status(
-                                    current_step=7,
-                                    total_steps=7,
-                                    step_description="✅ 任务完成!",
-                                    next_step_description="将在2秒后关闭"
-                                )
-                                time.sleep(2)  # Show completion for 2 seconds
+                                if self.current_task.status == TaskStatus.FAILED:
+                                    self.overlay.update_status(
+                                        current_step=7,
+                                        total_steps=7,
+                                        step_description=f"❌ 任务失败: {self.current_task.error_message[:30] if self.current_task.error_message else 'Unknown error'}",
+                                        next_step_description="将在3秒后关闭"
+                                    )
+                                    time.sleep(3)  # Show error for 3 seconds
+                                else:
+                                    self.overlay.update_status(
+                                        current_step=7,
+                                        total_steps=7,
+                                        step_description="✅ 任务完成!",
+                                        next_step_description="将在2秒后关闭"
+                                    )
+                                    time.sleep(2)  # Show completion for 2 seconds
                             except Exception:
                                 pass
 

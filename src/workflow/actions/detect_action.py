@@ -1,5 +1,6 @@
 import time
 import logging
+import tempfile
 from typing import Dict, Any
 from pathlib import Path
 from datetime import datetime
@@ -58,10 +59,10 @@ class DetectAction(BaseAction):
         if not template_path.exists():
             return StepResult(self.action_type, False, error=f"Template file not found: {template_path}")
             
-        # Get screenshot directory (use temp or project dir)
-        # Using current working dir / screenshots for now
-        screenshot_dir = Path("screenshots")
-        screenshot_dir.mkdir(exist_ok=True)
+        # Get screenshot directory (use temp directory to avoid permission issues in exe)
+        # Using system temp directory to ensure write access
+        screenshot_dir = Path(tempfile.gettempdir()) / "comet_taskrunner" / "screenshots"
+        screenshot_dir.mkdir(parents=True, exist_ok=True)
         
         start_time = time.time()
         

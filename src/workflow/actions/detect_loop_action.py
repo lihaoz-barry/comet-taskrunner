@@ -1,5 +1,6 @@
 import time
 import logging
+import tempfile
 from typing import Dict, Any
 from pathlib import Path
 from datetime import datetime
@@ -52,8 +53,8 @@ class DetectLoopAction(BaseAction):
         if not template_path.exists():
             return StepResult(self.action_type, True, data={'reason': 'template_not_found', 'skipped': True})
             
-        screenshot_dir = Path("screenshots")
-        screenshot_dir.mkdir(exist_ok=True)
+        screenshot_dir = Path(tempfile.gettempdir()) / "comet_taskrunner" / "screenshots"
+        screenshot_dir.mkdir(parents=True, exist_ok=True)
         
         start_time = time.time()
         attempt = 0
