@@ -27,8 +27,47 @@ Complete Postman Collection with all API endpoints organized into logical folder
 ### 2. `Comet_TaskRunner_Local.postman_environment.json`
 Environment configuration for local development with pre-configured variables:
 - `base_url`: http://127.0.0.1:5000
+- `api_key`: Empty (localhost doesn't require authentication)
 - `task_id`: Auto-populated by test scripts
 - `last_status`: Track last task status
+
+### 3. `Comet_TaskRunner_Remote.postman_environment.json`
+Environment configuration for remote/LAN access with authentication:
+- `base_url`: http://YOUR_SERVER_IP:5000 (update with your server IP)
+- `api_key`: my-secret-password-123 (configured API key)
+- `task_id`: Auto-populated by test scripts
+- `last_status`: Track last task status
+
+## 🔐 Authentication
+
+### Local Access (Localhost)
+When testing locally (127.0.0.1), **no authentication is required**. The backend automatically exempts localhost requests from API key validation.
+
+**Setup:**
+1. Use `Comet_TaskRunner_Local.postman_environment.json`
+2. The `api_key` variable is disabled by default
+3. All requests work without the `X-API-Key` header
+
+### Remote Access (LAN/Network)
+When accessing the backend from another machine on your network, **API key authentication is required**.
+
+**Setup:**
+1. Use `Comet_TaskRunner_Remote.postman_environment.json`
+2. Update `base_url` to your server's IP (e.g., `http://192.168.1.100:5000`)
+3. Set `api_key` to `my-secret-password-123` (or your configured key)
+4. All protected endpoints automatically include the `X-API-Key` header
+
+**Protected Endpoints:**
+- `POST /execute/url`
+- `POST /execute/ai`
+- All `/execute/*` endpoints
+
+**Public Endpoints (no auth required):**
+- `GET /health`
+- `GET /status/<task_id>`
+- `GET /manager/status`
+- `GET /jobs`
+
 
 ## 🚀 Quick Start
 
