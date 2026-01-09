@@ -424,23 +424,24 @@ def execute_workflow(task_type):
 @app.route('/status/<task_id>', methods=['GET'])
 def get_status(task_id):
     """
-    Get the current status of any task (URL or AI).
-    
+    Get the current status of any task (URL, AI, or workflow-based).
+
     This endpoint is polled by the frontend every ~1 second.
-    
+
     Process:
         1. Look up task by ID
         2. Check task-specific completion logic
         3. Auto-complete if task is done
-        4. Return current status
-    
+        4. Return current status with step history (for workflow tasks)
+
     Returns:
         {
             "status": "running" | "done" | "failed",
             "task_id": "uuid",
-            "task_type": "url" | "ai",
+            "task_type": "url" | "ai" | "custom",
             "url": "..." or "instruction": "...",
-            "process_id": 12345
+            "process_id": 12345,
+            "step_history": [...]  // For workflow-based tasks
         }
     """
     # Step 1: Find task
@@ -448,14 +449,14 @@ def get_status(task_id):
     if not task:
         logger.warning(f"Status requested for unknown task: {task_id}")
         return jsonify({"error": "Task ID not found"}), 404
-    
+
     # Step 2 & 3: Check completion using task-specific logic
     # For URLTask: checks if process exited
     # For AITask: checks process + AI detection (placeholder)
     if task.status == TaskStatus.RUNNING and task.check_completion():
         logger.info(f"Auto-completing task {task_id} via status check")
         task.complete()
-    
+
     # Step 4: Return status
     response = {
         "status": task.status.value,
@@ -463,7 +464,7 @@ def get_status(task_id):
         "task_type": task.task_type.value,
         "process_id": task.process_id
     }
-    
+
     # Add task-specific fields
     if task.task_type == TaskType.URL:
         response['url'] = task.url
@@ -471,7 +472,22 @@ def get_status(task_id):
         response['instruction'] = task.instruction
         # Add automation progress for AI tasks
         response['automation_progress'] = task.get_automation_progress()
-    
+    elif task.task_type == TaskType.CUSTOM:
+        # ConfigurableTask (workflow-based)
+        if hasattr(task, 'workflow_config'):
+            response['workflow_name'] = task.workflow_config.name
+        if hasattr(task, 'inputs'):
+            response['inputs'] = task.inputs
+            # Add instruction for backward compatibility
+            if 'instruction' in task.inputs:
+                response['instruction'] = task.inputs['instruction']
+        # Add progress info
+        if hasattr(task, 'get_progress'):
+            response['progress'] = task.get_progress()
+        # Add step execution history
+        if hasattr(task, 'get_step_history'):
+            response['step_history'] = task.get_step_history()
+
     return jsonify(response), 200
 
 

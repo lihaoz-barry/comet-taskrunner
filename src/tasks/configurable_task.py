@@ -55,24 +55,37 @@ class ConfigurableTask(BaseTask):
         """Execute all steps sequentially"""
         self.status = TaskStatus.RUNNING
         self.started_at = datetime.now()
-        
+
         try:
             for i, step in enumerate(self.workflow_config.steps):
                 self.current_step_index = i + 1
                 logger.info(f"Executing step {i+1}/{self.total_steps}: {step.name}")
-                
+
+                # Track step start time
+                step_started_at = datetime.now()
+
                 result = self.executor.execute_step(step)
+
+                # Enrich result with timing and metadata
+                step_completed_at = datetime.now()
+                result.step_index = i + 1
+                result.step_id = step.id
+                result.display_name = step.display_name or step.name
+                result.started_at = step_started_at
+                result.completed_at = step_completed_at
+                result.duration_ms = int((step_completed_at - step_started_at).total_seconds() * 1000)
+
                 self.step_results.append(result)
-                
+
                 if not result.success:
                     error_msg = f"Step '{step.name}' failed: {result.error}"
                     self.fail(error_msg)
                     return
-            
+
             # All steps finished
             self.completed = True
             self.complete()
-            
+
         except Exception as e:
             logger.info(f"TASK FAILED: {str(e)}")
             self.fail(str(e))
@@ -148,11 +161,20 @@ class ConfigurableTask(BaseTask):
             
         return descriptions
 
+    def get_step_history(self) -> list:
+        """
+        Get the execution history of all steps.
+
+        Returns:
+            List of step result dictionaries with timing and status info.
+        """
+        return [result.to_dict() for result in self.step_results]
+
     def to_dict(self) -> Dict[str, Any]:
         """
         Serialize task to dictionary.
 
-        Adds workflow-specific fields including inputs.
+        Adds workflow-specific fields including inputs and step history.
         """
         data = super().to_dict()
         data['workflow_name'] = self.workflow_config.name
@@ -161,4 +183,6 @@ class ConfigurableTask(BaseTask):
         # (frontend expects 'instruction' for AI tasks)
         if 'instruction' in self.inputs:
             data['instruction'] = self.inputs['instruction']
+        # Include step execution history
+        data['step_history'] = self.get_step_history()
         return data
