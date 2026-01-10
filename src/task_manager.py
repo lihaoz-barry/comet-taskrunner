@@ -106,15 +106,41 @@ class TaskManager:
     
     def get_task(self, task_id: str) -> Optional[BaseTask]:
         """
-        Retrieve a task by ID.
+        Retrieve a task by ID (supports both full UUID and short prefix).
         
         Args:
-            task_id: The task ID
+            task_id: The task ID (full UUID or prefix like '530db28a')
             
         Returns:
             BaseTask or None
+            
+        Behavior:
+            1. First tries exact match (backward compatible)
+            2. If not found and input looks like short ID (8-12 chars), 
+               tries prefix matching
+            3. Returns None if no match or multiple matches found
         """
-        return self.tasks.get(task_id)
+        # Try exact match first (most common case, fastest)
+        if task_id in self.tasks:
+            return self.tasks[task_id]
+        
+        # If not found and looks like a short ID, try prefix matching
+        # UUIDs are 36 chars, short IDs are typically 8-12 chars
+        if len(task_id) <= 12:
+            matches = [
+                task for tid, task in self.tasks.items()
+                if tid.startswith(task_id)
+            ]
+            
+            if len(matches) == 1:
+                logger.debug(f"Short ID '{task_id}' matched to full ID: {matches[0].task_id}")
+                return matches[0]
+            elif len(matches) > 1:
+                logger.warning(f"Short ID '{task_id}' is ambiguous, matches {len(matches)} tasks")
+                return None
+            # else: no matches, fall through
+        
+        return None
     
     def get_all_tasks(self) -> Dict[str, Dict]:
         """

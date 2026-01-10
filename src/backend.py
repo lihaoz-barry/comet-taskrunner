@@ -444,11 +444,29 @@ def get_status(task_id):
             "step_history": [...]  // For workflow-based tasks
         }
     """
-    # Step 1: Find task
+    # Step 1: Find task (supports short IDs now)
     task = task_manager.get_task(task_id)
     if not task:
+        # Check if it might be an ambiguous short ID
+        if len(task_id) <= 12:
+            matches = [
+                tid for tid in task_manager.tasks.keys()
+                if tid.startswith(task_id)
+            ]
+            if len(matches) > 1:
+                logger.warning(f"Ambiguous short task ID '{task_id}', matches: {matches}")
+                return jsonify({
+                    "error": f"Ambiguous task ID '{task_id}'",
+                    "matches": matches[:5],  # Show first 5 matches
+                    "hint": "Please use a longer prefix or full task ID"
+                }), 400
+        
         logger.warning(f"Status requested for unknown task: {task_id}")
-        return jsonify({"error": "Task ID not found"}), 404
+        return jsonify({
+            "error": "Task ID not found",
+            "task_id": task_id,
+            "hint": "Task may have been cleaned up or ID is incorrect"
+        }), 404
 
     # Step 2 & 3: Check completion using task-specific logic
     # For URLTask: checks if process exited
