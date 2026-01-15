@@ -37,7 +37,6 @@ class BoundingBoxOverlay:
         self.root: Optional[tk.Tk] = None
         self.canvas: Optional[tk.Canvas] = None
         self.running = False
-        self.animation_thread: Optional[threading.Thread] = None
         self.lock = threading.Lock()
         
         logger.info("BoundingBoxOverlay initialized")
@@ -54,17 +53,14 @@ class BoundingBoxOverlay:
         """
         logger.info(f"Showing bounding box at ({x}, {y}) with size {width}x{height}")
         
-        # Start animation in a separate thread
-        if self.animation_thread and self.animation_thread.is_alive():
-            logger.warning("Previous animation still running, skipping...")
-            return
-        
-        self.animation_thread = threading.Thread(
+        # Create and run the animation in a separate thread
+        # Each overlay instance is independent
+        animation_thread = threading.Thread(
             target=self._animate_box,
             args=(x, y, width, height),
             daemon=True
         )
-        self.animation_thread.start()
+        animation_thread.start()
     
     def _animate_box(self, x: int, y: int, width: int, height: int):
         """
@@ -74,7 +70,7 @@ class BoundingBoxOverlay:
             x, y, width, height: Bounding box coordinates
         """
         try:
-            # Create window on the main thread
+            # Create window (tkinter handles threading internally)
             self._create_window(x, y, width, height)
             
             # Fade in
