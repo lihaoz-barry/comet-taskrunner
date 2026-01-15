@@ -9,7 +9,14 @@ import tkinter as tk
 import threading
 import time
 import logging
-from typing import Tuple, Optional
+from typing import Optional
+
+# Import ctypes at module level for Windows-specific features
+try:
+    import ctypes
+    CTYPES_AVAILABLE = True
+except ImportError:
+    CTYPES_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +43,6 @@ class BoundingBoxOverlay:
         """Initialize the bounding box overlay"""
         self.root: Optional[tk.Tk] = None
         self.canvas: Optional[tk.Canvas] = None
-        self.running = False
-        self.lock = threading.Lock()
         
         logger.info("BoundingBoxOverlay initialized")
     
@@ -97,27 +102,27 @@ class BoundingBoxOverlay:
             x, y: Screen coordinates for top-left corner
             width, height: Dimensions of the bounding box
         """
-        with self.lock:
-            if self.root:
-                return
-            
-            self.root = tk.Tk()
-            self.root.withdraw()  # Start hidden
-            
-            # Window properties
-            self.root.overrideredirect(True)  # No window decorations
-            self.root.attributes('-topmost', True)  # Always on top
-            self.root.attributes('-alpha', 0.0)  # Start fully transparent
-            
-            # Hide from taskbar (Windows)
+        # Check if window already exists
+        if self.root:
+            return
+        
+        self.root = tk.Tk()
+        self.root.withdraw()  # Start hidden
+        
+        # Window properties
+        self.root.overrideredirect(True)  # No window decorations
+        self.root.attributes('-topmost', True)  # Always on top
+        self.root.attributes('-alpha', 0.0)  # Start fully transparent
+        
+        # Hide from taskbar (Windows)
+        try:
+            self.root.attributes('-toolwindow', True)
+        except tk.TclError:
+            pass
+        
+        # Make click-through (Windows)
+        if CTYPES_AVAILABLE:
             try:
-                self.root.attributes('-toolwindow', True)
-            except tk.TclError:
-                pass
-            
-            # Make click-through (Windows)
-            try:
-                import ctypes
                 self.root.update()
                 hwnd = ctypes.windll.user32.GetParent(self.root.winfo_id())
                 if hwnd:
@@ -131,37 +136,37 @@ class BoundingBoxOverlay:
                     )
             except Exception as e:
                 logger.warning(f"Failed to make window click-through: {e}")
-            
-            # Set window size and position
-            self.root.geometry(f"{width}x{height}+{x}+{y}")
-            
-            # Create canvas for drawing
-            self.canvas = tk.Canvas(
-                self.root,
-                width=width,
-                height=height,
-                bg='black',
-                highlightthickness=0
-            )
-            self.canvas.pack()
-            
-            # Draw red rectangle
-            # Use a thick border for visibility
-            border_width = 4
-            self.canvas.create_rectangle(
-                border_width // 2,
-                border_width // 2,
-                width - border_width // 2,
-                height - border_width // 2,
-                outline='red',
-                width=border_width
-            )
-            
-            # Show window
-            self.root.deiconify()
-            self.root.update()
-            
-            logger.debug(f"Window created at ({x}, {y}) with size {width}x{height}")
+        
+        # Set window size and position
+        self.root.geometry(f"{width}x{height}+{x}+{y}")
+        
+        # Create canvas for drawing
+        self.canvas = tk.Canvas(
+            self.root,
+            width=width,
+            height=height,
+            bg='black',
+            highlightthickness=0
+        )
+        self.canvas.pack()
+        
+        # Draw red rectangle
+        # Use a thick border for visibility
+        border_width = 4
+        self.canvas.create_rectangle(
+            border_width // 2,
+            border_width // 2,
+            width - border_width // 2,
+            height - border_width // 2,
+            outline='red',
+            width=border_width
+        )
+        
+        # Show window
+        self.root.deiconify()
+        self.root.update()
+        
+        logger.debug(f"Window created at ({x}, {y}) with size {width}x{height}")
     
     def _fade_animation(self, start_alpha: float, end_alpha: float, duration: float):
         """
@@ -181,37 +186,39 @@ class BoundingBoxOverlay:
         
         alpha_delta = (end_alpha - start_alpha) / steps
         
+        # Optimize: Direct tkinter calls without lock in tight loop
+        # (Each overlay runs in its own thread with its own tkinter instance)
         for i in range(steps):
             current_alpha = start_alpha + (alpha_delta * i)
             
-            with self.lock:
-                if self.root:
-                    try:
-                        self.root.attributes('-alpha', current_alpha)
-                        self.root.update()
-                    except tk.TclError:
-                        break
+            # Check if root still exists
+            if not self.root:
+                break
+                
+            try:
+                self.root.attributes('-alpha', current_alpha)
+                self.root.update()
+            except tk.TclError:
+                break
             
             time.sleep(self.FRAME_INTERVAL)
         
         # Set final alpha
-        with self.lock:
-            if self.root:
-                try:
-                    self.root.attributes('-alpha', end_alpha)
-                    self.root.update()
-                except tk.TclError:
-                    pass
+        if self.root:
+            try:
+                self.root.attributes('-alpha', end_alpha)
+                self.root.update()
+            except tk.TclError:
+                pass
     
     def _destroy_window(self):
         """Clean up and destroy the overlay window"""
-        with self.lock:
-            if self.root:
-                try:
-                    self.root.destroy()
-                except Exception as e:
-                    logger.warning(f"Error destroying window: {e}")
-                finally:
-                    self.root = None
-                    self.canvas = None
-                    logger.debug("Window destroyed")
+        if self.root:
+            try:
+                self.root.destroy()
+            except Exception as e:
+                logger.warning(f"Error destroying window: {e}")
+            finally:
+                self.root = None
+                self.canvas = None
+                logger.debug("Window destroyed")
