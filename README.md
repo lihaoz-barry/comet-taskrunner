@@ -10,6 +10,7 @@ A Python-based automation tool for Comet Browser with support for URL navigation
 
 - **URL Task Automation**: Automatically open and navigate to URLs in Comet Browser
 - **AI Assistant Integration**: Automate AI assistant interactions with custom instructions
+- **Visual Widget Detection**: Real-time bounding box animation with gradient fade-in/out when widgets are detected
 - **Component-Based Architecture**: Extensible task system with abstract base classes
 - **Real-time Monitoring**: Track task status with process monitoring and polling
 - **User-Friendly GUI**: Tkinter-based frontend for easy task management
@@ -227,11 +228,29 @@ For detailed documentation, see the `docs/` directory:
 - `task_lifecycle.md` - Task lifecycle details
 - `implementation_plan.md` - Development roadmap
 - `组件化设计.md` - Component design patterns
+- `BOUNDING_BOX_VISUALIZATION.md` - Visual feedback feature documentation
+
+## Visual Widget Detection
+
+The system now includes **real-time visual feedback** when widgets are detected during automation:
+
+- **Red Bounding Box**: Displays at the exact location of detected widgets
+- **Smooth Gradient Animation**: Fast fade-in (0.3s) → display (0.5s) → fade-out (0.3s)
+- **Non-intrusive**: Click-through overlay that doesn't interfere with automation
+- **Automatic**: No configuration needed - works out of the box
+
+To see the feature in action:
+```bash
+python demo_bounding_box.py
+```
+
+See `docs/BOUNDING_BOX_VISUALIZATION.md` for detailed documentation.
 
 ## Future Development
 
 - [ ] Complete AI task automation (mouse/keyboard control)
 - [ ] Screenshot-based completion detection
+- [x] Visual feedback for widget detection (completed)
 - [ ] OpenCV/AI model integration
 - [ ] Coordinate calibration tool
 - [ ] Task scheduling and queuing

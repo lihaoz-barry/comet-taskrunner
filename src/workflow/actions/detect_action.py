@@ -7,6 +7,8 @@ from datetime import datetime
 from . import BaseAction, StepResult
 # Import automation components
 from automation import ScreenshotCapture, PatternMatcher, WindowManager
+# Import overlay for visual feedback
+from overlay import BoundingBoxOverlay
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +105,22 @@ class DetectAction(BaseAction):
                 if result:
                     # Unpack new return format: (center_coords, match_box, confidence)
                     center_coords, match_box, confidence = result
+                    
+                    # Show visual feedback with bounding box animation
+                    try:
+                        # match_box is in screenshot coordinates (x, y, w, h)
+                        # Convert to screen coordinates for display
+                        match_x, match_y, match_w, match_h = match_box
+                        left, top, right, bottom = window_rect
+                        screen_x = left + match_x
+                        screen_y = top + match_y
+                        
+                        # Display animated bounding box
+                        bbox_overlay = BoundingBoxOverlay()
+                        bbox_overlay.show_bounding_box(screen_x, screen_y, match_w, match_h)
+                        logger.info(f"Visual feedback displayed for detected widget at ({screen_x}, {screen_y})")
+                    except Exception as e:
+                        logger.warning(f"Failed to display bounding box overlay: {e}")
                     
                     # Calculate click position based on configuration
                     from automation.click_position import ClickPosition
